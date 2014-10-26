@@ -8325,5 +8325,12 @@ struct cgroup_subsys cpuacct_subsys = {
  */
 SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 {
-	return 777;
+	if (current_euid() != 0 && current_uid() != 0)
+		return -EACCES;
+	if (numCPU < 1 && numCPU >= NR_CPUS)
+		return -EINVAL;
+	if (group != 1 && group != 2)
+		return -EINVAL;
+
+	return 0;
 }
