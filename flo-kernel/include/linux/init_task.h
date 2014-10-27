@@ -134,6 +134,18 @@ extern struct cred init_cred;
 
 #define INIT_TASK_COMM "swapper"
 
+#ifdef CONFIG_GRR
+#define SCHED_NORMAL_OR_GRR SCHED_GRR
+#define RR_TIMESLICE 100 * HZ / 1000
+#define INIT_GRR \
+	.grr▸    ▸       = {▸    ▸       ▸       ▸       ▸       	\
+		.time_slice▸    = RR_TIMESLICE,▸ 			\
+	},
+#else
+#define SCHED_NORMAL_OR_GRR SCHED_NORMAL
+#define INIT_GRR
+#endif
+
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
@@ -147,7 +159,7 @@ extern struct cred init_cred;
 	.prio		= MAX_PRIO-20,					\
 	.static_prio	= MAX_PRIO-20,					\
 	.normal_prio	= MAX_PRIO-20,					\
-	.policy		= SCHED_NORMAL,					\
+	.policy		= SCHED_NORMAL_OR_GRR,				\
 	.cpus_allowed	= CPU_MASK_ALL,					\
 	.mm		= NULL,						\
 	.active_mm	= &init_mm,					\
@@ -159,6 +171,7 @@ extern struct cred init_cred;
 		.time_slice	= RR_TIMESLICE,				\
 		.nr_cpus_allowed = NR_CPUS,				\
 	},								\
+	INIT_GRR							\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	INIT_PUSHABLE_TASKS(tsk)					\
 	.ptraced	= LIST_HEAD_INIT(tsk.ptraced),			\
