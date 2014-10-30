@@ -136,10 +136,10 @@ extern struct cred init_cred;
 
 #ifdef CONFIG_GRR
 #define SCHED_NORMAL_OR_GRR SCHED_GRR
-#define RR_TIMESLICE 100 * HZ / 1000
+#define GRR_TIMESLICE 100 * HZ / 1000
 #define INIT_GRR \
 	.grr▸    ▸       = {▸    ▸       ▸       ▸       ▸       	\
-		.time_slice▸    = RR_TIMESLICE,▸ 			\
+		.time_slice▸    = GRR_TIMESLICE,▸ 			\
 	},
 #else
 #define SCHED_NORMAL_OR_GRR SCHED_NORMAL
