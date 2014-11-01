@@ -1742,6 +1742,14 @@ static void __sched_fork(struct task_struct *p)
 #endif
 }
 
+#ifdef CONFIG_GRR
+static inline is_grr_prio(struct task_struct *p)
+{
+	if (p->policy == SCHED_GRR)
+		return 1;
+	return 0;
+#endif
+
 /*
  * fork()/clone()-time setup:
  */
@@ -1768,13 +1776,19 @@ void sched_fork(struct task_struct *p)
 	 */
 	if (unlikely(p->sched_reset_on_fork)) {
 		if (task_has_rt_policy(p)) {
+#ifdef CONFIG_GRR
+			p->policy = SCHED_GRR;
+#else
 			p->policy = SCHED_NORMAL;
 			p->static_prio = NICE_TO_PRIO(0);
 			p->rt_priority = 0;
+#endif
 		} else if (PRIO_TO_NICE(p->static_prio) < 0)
 			p->static_prio = NICE_TO_PRIO(0);
 
+#if !defined(CONFIG_GRR)
 		p->prio = p->normal_prio = __normal_prio(p);
+#endif
 		set_load_weight(p);
 
 		/*
@@ -1784,6 +1798,13 @@ void sched_fork(struct task_struct *p)
 		p->sched_reset_on_fork = 0;
 	}
 
+#ifdef CONFIG_GRR
+	if (is_grr_prio(p))
+		p->sched_class = &grr_sched_class;
+	else
+#endif
+
+		/* check grr_prio */
 	if (!rt_prio(p->prio))
 		p->sched_class = &fair_sched_class;
 
