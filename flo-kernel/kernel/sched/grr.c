@@ -24,6 +24,89 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
 {
 }
 
+struct load {
+	struct rq *rq;
+	int value;
+};
+
+static struct task_struct get_next_grr_task(struct rq *rq)
+{
+	struct list_head queue;
+	struct task_struct *p;
+
+	if (grr_rq == NULL)
+		return NULL;
+
+	list_head queue = (rq->grr)->queue;
+
+	return list_first_entry(&p, struct task_struct, queue);
+}
+
+static void grr_load_balance(void)
+{
+	unsigned long i;
+	unsigned long online_cpus;
+	struct load maxload;
+	struct load minload;
+
+	maxload.value = 0;
+	minload.value = 0;
+
+	/*
+	 * iterate through each CPU and
+	 * find the min and max load accros all CPUs
+	 */
+	for_each_online_cpu(i) {
+		/* get rq of current CPU */
+		struct rq *rq = cpu_rq(i);
+		/* get grr_rq of current CPU */
+		struct grr_rq *grr_rq = &rq->grr;
+		/* get nr of running jobs under the GRR policy */
+		unsigned long nr_running = grr_rq->grr_nr_running;
+
+		if (maxload.value < nr_running) {
+			maxload.value = nr_running;
+			maxload.rq = grr_rq;
+		}
+		if (minload.value > nr_running) {
+			minload.value = nr_running;
+			minload.rq = grr_rq;
+		}
+		online_cpus++;
+	}
+
+	/* given the min and max load
+	 * decide if you should load balance
+	 */
+	if (maxload.value > minload.value+1) {
+		/* worth load balancing */
+		/* check __migrate_task() from core.c */
+		struct rq *source_rq = maxload.rq;
+		struct rq *target_rq = minload.rq;
+
+		/* lock RQs */
+		double_rq_lock(source_rq, target_rq);
+		rcu_read_lock();
+
+		/* get next eligible task from source_rq */
+		struct task_struct *p = get_next_grr_task(source_rq);
+
+		// TODO: check if task can be moved
+
+		/* move task p from source_rq to target_rq
+		 * see sched_move_task() in core.c for details
+		 */
+		deactivate_task(source_rq, p, 0);
+		set_task_cpu(p, target_rq->cpu);
+		activate_task(target_rq, p, 0);
+
+		rcu_read(unlock();
+		double_rq_unlock(source_rq, target_rq);
+	} else {
+		return;
+	}
+}
+
 void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
 {
 	INIT_LIST_HEAD(&grr_rq->queue);
@@ -485,20 +568,49 @@ requeue_rt_entity(struct rt_rq *rt_rq, struct sched_rt_entity *rt_se, int head)
 {
 }
 
-static void requeue_task_rt(struct rq *rq, struct task_struct *p, int head)
+static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 {
+	struct sched_grr_entity *grr_se = &p->grr;
+	struct grr_rq *grr_rq = &rq->grr;
+	list_move_tail(&grr_se->task_queue, &grr_rq->queue);
 }
 
-static void yield_task_rt(struct rq *rq)
+static void yield_task_grr(struct rq *rq)
 {
+	requeue_task_grr(rq,rq->curr,0);
 }
 
 #ifdef CONFIG_SMP
 static int find_lowest_rq(struct task_struct *task);
 
 static int
-select_task_rq_rt(struct task_struct *p, int sd_flag, int flags)
+select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
+	int i;
+	int orig_cpu = task_cpu(p);
+	struct rq *rq;
+	int smallest_rq = orig_cpu;
+	unsigned long orig_weight = cpu_rq(orig_cpu)->grr.grr_nr_total;
+	unsigned long smallest_rq_weight = orig_weight;
+
+	if (p->nr_cpus_allowed == 1)
+		return orig_cpu;
+
+	rq = cpu_rq(orig_cpu);
+
+	/*
+	 * Here load balancing should take place
+	 */
+
+	for_each_online_cpu(i) {
+		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
+		if (!cpumask_test_cpu(i, &p->cpus_allowed))
+			continue;
+		if (grr_rq->grr_nr_total < smallest_rq_weight) {
+			smallest_rq_weight = grr_rq->grr_nr_total;
+			smallest_rq = i;
+		}
+	}
 }
 
 static void check_preempt_equal_prio(struct rq *rq, struct task_struct *p)
@@ -516,37 +628,31 @@ static void check_preempt_curr_rt(struct rq *rq, struct task_struct *p, int flag
 #endif
 }
 
-static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
-						   struct rt_rq *rt_rq)
+/*static struct sched_rt_entity *pick_next_grr_entity(struct rq *rq,
+						   struct grr_rq *grr_rq)
 {
-}
+	NO NEED FOR THIS FUNCTION AS IT WAS A HELPER FOR pick_next_task
+}*/
 
-static struct task_struct *_pick_next_task_grr(struct rq *rq)
-{
-	struct sched_grr_entity *grr_se;
-	struct task_struct *p;
-	struct grr_rq *grr_rq = &rq->grr;
-
-	if (!grr_rq->grr_nr_running)
-		return NULL;
-
-	do {
-		grr_se = pick_next_entity(grr_rq);
-		set_next_entity(grr_rq, grr_se);
-		grr_rq = group_grr_rq(grr_se);
-	} while (grr_rq);
-
-	p = grr_task_of(grr_se);
-	p->se.exec_start = rq->clock_task;
-
-	return p;
-}
-
+/*
+ * As we want a round robin we should put all of our task in a queue.
+ * Then the pick_next_task will be just get the head of this list
+ */
 static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
-	struct task_struct *p = _pick_next_task_grr(rq);
-#ifdef CONFIG_SMP
-#endif
+	struct sched_grr_entity *haed;
+	struct task_struct *p;
+	struct grr_rq *grr_rq  = &rq->grr;
+
+	if (unlikely(!grr_rq->nr_running))
+		return NULL;
+
+	head = list_first_entry(&rq->grr.queue, struct sched_grr_entity,
+				task_queue);
+
+	p = grr_task_of(head);
+	p->se.exec_start = rq->clock;
+	return p;
 }
 
 static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
@@ -747,7 +853,7 @@ const struct sched_class sched_grr_class = {
 	.next			= &fair_sched_class,
 	.enqueue_task		= enqueue_task_grr,
 	.dequeue_task		= dequeue_task_grr,
-	.yield_task		=,
+	.yield_task		= yield_task_grr,
 
 	.check_preempt_curr	=,
 
@@ -755,7 +861,7 @@ const struct sched_class sched_grr_class = {
 	.put_prev_task		= put_prev_task_grr,
 
 #ifdef CONFIG_SMP
-	.select_task_rq		=,
+	.select_task_rq		= select_task_rq_wrr,
 /*	.rq_online		=, */
 /*	.rq_offline		=, */
 /*	.switched_from		=, */
@@ -789,63 +895,3 @@ void print_grr_stats(struct seq_file *m, int cpu)
 
 }
 #endif /* CONFIG_SCHED_DEBUG */
-
-struct load {
-	struct rq *rq;
-	int value;
-};
-
-static void grr_load_balance(void)
-{
-	unsigned long i;
-	unsigned long online_cpus;
-	struct load maxload;
-	struct load minload;
-
-	maxload.value = 0;
-	minload.value = 0;
-
-	/*
-	 * iterate through each CPU and
-	 * find the min and max load accros all CPUs
-	 */
-	for_each_online_cpu(i) {
-		/* get rq of current CPU */
-		struct rq *rq = cpu_rq(i);
-		/* get grr_rq of current CPU */
-		struct grr_rq *grr_rq = &rq->grr;
-		/* get nr of running jobs under the GRR policy */
-		unsigned long nr_running = grr_rq->grr_nr_running;
-
-		if (maxload.value < nr_running) {
-			maxload.value = nr_running;
-			maxload.rq = grr_rq;
-		}
-		if (minload.value > nr_running) {
-			minload.value = nr_running;
-			minload.rq = grr_rq;
-		}
-		online_cpus++;
-	}
-
-	/* given the min and max load
-	 * decide if you should load balance
-	 */
-	if (maxload.value > minload.value+1) {
-		/* worth load balancing */
-		struct rq *source_rq = maxload.rq;
-		struct rq *target_rq = minload.rq;
-
-		/* get next eligible task from source_rq */
-		struct task_struct *p = get_next_task(); // TODO: fill in correct func
-
-		/* move task p from source_rq to target_rq
-		 * see sched_move_task() in core.c for details
-		 */
-		deactivate_task(source_rq, p, 0);
-		set_task_cpu(p, target_rq->cpu);
-		actovate_task(target_rq, p, 0);
-	} else {
-		return;
-	}
-}
