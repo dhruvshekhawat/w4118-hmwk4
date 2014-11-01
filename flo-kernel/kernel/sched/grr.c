@@ -42,10 +42,17 @@ static struct task_struct get_next_grr_task(struct rq *rq)
 	return list_first_entry(&p, struct task_struct, queue);
 }
 
+static int can_move_grr_task(struct task_struct *p)
+{
+	return 0;
+}
+
 static void grr_load_balance(void)
 {
 	unsigned long i;
 	unsigned long online_cpus;
+	struct rq *source_rq;
+	struct rq *target_rq;
 	struct load maxload;
 	struct load minload;
 
@@ -81,17 +88,25 @@ static void grr_load_balance(void)
 	if (maxload.value > minload.value+1) {
 		/* worth load balancing */
 		/* check __migrate_task() from core.c */
-		struct rq *source_rq = maxload.rq;
-		struct rq *target_rq = minload.rq;
+		source_rq = maxload.rq;
+		target_rq = minload.rq;
 
 		/* lock RQs */
 		double_rq_lock(source_rq, target_rq);
 		rcu_read_lock();
 
+		/* TODO: maybe put the next few lines in a loop
+		 * until you find an eligible task to be moved??? */
+
 		/* get next eligible task from source_rq */
 		struct task_struct *p = get_next_grr_task(source_rq);
 
-		// TODO: check if task can be moved
+		if (p == NULL)
+			goto unlock;
+
+		/* TODO: what do you do if p cannot be moved? move to the next? */
+		if (!can_move_grr_task(p))
+			goto unlock;
 
 		/* move task p from source_rq to target_rq
 		 * see sched_move_task() in core.c for details
@@ -100,11 +115,13 @@ static void grr_load_balance(void)
 		set_task_cpu(p, target_rq->cpu);
 		activate_task(target_rq, p, 0);
 
-		rcu_read(unlock();
-		double_rq_unlock(source_rq, target_rq);
-	} else {
-		return;
+		goto unlock;
 	}
+	return;
+
+unlock:
+	rcu_read_unlock();
+	double_rq_unlock(source_rq, target_rq);
 }
 
 void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
