@@ -27,6 +27,7 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
 struct load {
 	struct rq *rq;
 	int value;
+	int cpu;
 };
 
 static struct task_struct get_next_grr_task(struct rq *rq)
@@ -42,19 +43,30 @@ static struct task_struct get_next_grr_task(struct rq *rq)
 	return list_first_entry(&p, struct task_struct, queue);
 }
 
-static int can_move_grr_task(struct task_struct *p)
+static int can_move_grr_task(struct task_struct *p,
+							 struct rq *source,
+							 struct rq *target)
 {
-	return 0;
+	/* see __migrate_task() in core.c for details */
+	if (!cpumask_test_cpu(target->cpu, tsk_cpus_allowed(p)))
+		return 0;
+	if (!cpu_online(target))
+		return 0;
+	if (task_cpu(p) != source->cpu)
+		return 0;
+	if (task_running(source->cpu, p))
+		return 0;
+	return 1;
 }
 
 static void grr_load_balance(void)
 {
 	unsigned long i;
-	unsigned long online_cpus;
 	struct rq *source_rq;
 	struct rq *target_rq;
 	struct load maxload;
 	struct load minload;
+	int cpus_online;
 
 	maxload.value = 0;
 	minload.value = 0;
@@ -74,12 +86,14 @@ static void grr_load_balance(void)
 		if (maxload.value < nr_running) {
 			maxload.value = nr_running;
 			maxload.rq = grr_rq;
+			maxload.cpu = i;
 		}
 		if (minload.value > nr_running) {
 			minload.value = nr_running;
 			minload.rq = grr_rq;
+			minload.cpu = i;
 		}
-		online_cpus++;
+		cpus_online++;
 	}
 
 	/* given the min and max load
@@ -104,8 +118,7 @@ static void grr_load_balance(void)
 		if (p == NULL)
 			goto unlock;
 
-		/* TODO: what do you do if p cannot be moved? move to the next? */
-		if (!can_move_grr_task(p))
+		if (!can_move_grr_task(p, maxload.cpu))
 			goto unlock;
 
 		/* move task p from source_rq to target_rq
