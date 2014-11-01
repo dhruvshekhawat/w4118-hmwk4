@@ -49,6 +49,7 @@ static int can_move_grr_task(struct task_struct *p)
 
 static void grr_load_balance(void)
 {
+	trace_printk("GRR: grr_load_balance\n")
 	unsigned long i;
 	unsigned long online_cpus;
 	struct rq *source_rq;
@@ -126,6 +127,7 @@ unlock:
 
 void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
 {
+	trace_printk("GRR: init_grr_rq\n")
 	INIT_LIST_HEAD(&grr_rq->queue);
 	grr_rq->grr_nr_running = 0;
 }
@@ -150,6 +152,7 @@ static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
  */
 static void update_curr_grr(struct rq *rq)
 {
+	trace_printk("GRR: update_curr_grr\n")
 	struct task_struct *curr = rq->curr;
 	struct sched_grr_entity *grr_se = &curr->grr;
 	struct grr_rq *grr_rq = grr_rq_of_se(grr_se);
@@ -173,8 +176,9 @@ static void update_curr_grr(struct rq *rq)
 
 }
 
-static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
+static void dequeue_grr_entity(struct sched_grr_entity *grr_se)
 {
+	trace_printk("GRR: dequeue_grr_entity\n")
 	/*
 	 * Drop connection of this entity with runque but
 	 * reinitialize it to be reconnected later.
@@ -184,6 +188,7 @@ static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
 
 static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
 {
+	trace_printk("GRR: enqueue_grr_entity\n")
 	if (head)
 		list_add(&grr_se->task_queue, queue);
 	else
@@ -196,6 +201,7 @@ static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
 static void
 enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
+	trace_printk("GRR: enqueue_task_grr\n")
 	struct sched_grr_entity *grr_se = &p->grr;
 
 	enqueue_grr_entity(grr_se, flags & ENQUEUE_HEAD);
@@ -205,6 +211,7 @@ enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 static void
 dequeue_task_grr(struct rq *rq, struct task_struct *p)
 {
+	trace_printk("GRR: dequeue_task_grr\n")
 	struct sched_grr_entity *grr_se = &p->grr;
 
 	update_curr_grr(rq);
@@ -215,6 +222,7 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p)
 
 static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 {
+	trace_printk("GRR: requeue_task_grr\n")
 	struct sched_grr_entity *grr_se = &p->grr;
 	struct grr_rq *grr_rq = &rq->grr;
 	list_move_tail(&grr_se->task_queue, &grr_rq->queue);
@@ -222,12 +230,14 @@ static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 
 static void yield_task_grr(struct rq *rq)
 {
+	trace_printk("GRR: yield_task_grr\n")
 	requeue_task_grr(rq,rq->curr,0);
 }
 
 static int
 select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
+	trace_printk("GRR: select_task_rq_grr\n")
 	int i;
 	int orig_cpu = task_cpu(p);
 	struct rq *rq;
@@ -260,6 +270,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
  */
 static void check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int flags)
 {
+	trace_printk("GRR: check_preempt_curr_grr\n")
 	(void)rq;
 	(void)p;
 	(void)flags;
@@ -271,6 +282,7 @@ static void check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int fla
  */
 static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
+	trace_printk("GRR: pick_next_task_grr\n")
 	struct sched_grr_entity *haed;
 	struct task_struct *p;
 	struct grr_rq *grr_rq  = &rq->grr;
@@ -288,6 +300,7 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 
 static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 {
+	trace_printk("GRR: put_prev_task_grr\n")
 	/*
 	 * As we are round robin we should put the start
 	 * to 0 and update the current task
@@ -304,6 +317,7 @@ static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
  */
 static void switched_to_grr(struct rq *rq, struct task_struct *p)
 {
+	trace_printk("GRR: switched_to_grr\n")
 	(void)rq;
 	(void)p;
 }
@@ -315,6 +329,7 @@ static void switched_to_grr(struct rq *rq, struct task_struct *p)
 static void
 prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
 {
+	trace_printk("GRR: prio_changed_grr\n")
 	(void)rq;
 	(void)p;
 	(void)oldprio;
@@ -322,6 +337,7 @@ prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
 
 static void watchdog(struct rq *rq, struct task_struct *p)
 {
+	trace_printk("GRR: watchdog\n")
 	unsigned long soft, hard;
 
 	/* max may change after cur was read, this will be fixed next tick */
@@ -340,6 +356,7 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 
 static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 {
+	trace_printk("GRR: task_tick_grr\n")
 	struct sched_grr_entity *grr_se = &p->grr;
 
 	update_curr_grr(rq);
@@ -366,6 +383,7 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 
 static void set_curr_task_grr(struct rq *rq)
 {
+	trace_printk("GRR: set_curr_task_grr\n")
 	struct task_struct *p = rq->curr;
 
 	p->se.exec_start = rq->clock_task;
@@ -376,6 +394,7 @@ static void set_curr_task_grr(struct rq *rq)
 
 static unsigned int get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 {
+	trace_printk("GRR: get_rr_interval_grr")
 	return GRR_TIMESLICE;
 }
 
