@@ -1250,6 +1250,7 @@ struct sched_rt_entity {
 };
 
 #ifdef CONFIG_GRR
+#define GRR_TIMESLICE		(100 * HZ / 1000)
 struct sched_grr_entity {
 	struct list_head run_list;
 	unsigned long timeout;
