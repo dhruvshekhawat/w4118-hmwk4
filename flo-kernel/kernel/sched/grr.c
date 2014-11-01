@@ -809,6 +809,19 @@ struct load {
 	int value;
 };
 
+static struct task_struct get_next_grr_task(struct rq *rq)
+{
+	struct list_head queue;
+	struct task_struct *p;
+
+	if (grr_rq == NULL)
+		return NULL;
+
+	list_head queue = (rq->grr)->queue;
+
+	return list_first_entry(&p, struct task_struct, queue);
+}
+
 static void grr_load_balance(void)
 {
 	unsigned long i;
@@ -851,14 +864,16 @@ static void grr_load_balance(void)
 		struct rq *target_rq = minload.rq;
 
 		/* get next eligible task from source_rq */
-		struct task_struct *p = get_next_task(); // TODO: fill in correct func
+		struct task_struct *p = get_next_grr_task(source_rq);
+
+		// TODO: check if task can be moved
 
 		/* move task p from source_rq to target_rq
 		 * see sched_move_task() in core.c for details
 		 */
 		deactivate_task(source_rq, p, 0);
 		set_task_cpu(p, target_rq->cpu);
-		actovate_task(target_rq, p, 0);
+		activate_task(target_rq, p, 0);
 	} else {
 		return;
 	}
