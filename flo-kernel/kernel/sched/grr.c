@@ -811,6 +811,8 @@ struct load {
 
 static void grr_load_balance(void)
 {
+	unsigned long i;
+	unsigned long online_cpus;
 	struct load maxload;
 	struct load minload;
 
@@ -819,7 +821,7 @@ static void grr_load_balance(void)
 
 	/*
 	 * iterate through each CPU and
-	 * find the min and max load for each group
+	 * find the min and max load accros all CPUs
 	 */
 	for_each_online_cpu(i) {
 		/* get rq of current CPU */
@@ -832,14 +834,32 @@ static void grr_load_balance(void)
 		if (maxload.value < nr_running) {
 			maxload.value = nr_running;
 			maxload.rq = grr_rq;
-		} else if (minload.value > nr_running) {
+		}
+		if (minload.value > nr_running) {
 			minload.value = nr_running;
 			minload.rq = grr_rq;
 		}
+		online_cpus++;
 	}
 
-	/* check if given the min and max load
-	 * you should load balance
+	/* given the min and max load
+	 * decide if you should load balance
 	 */
+	if (maxload.value > minload.value+1) {
+		/* worth load balancing */
+		struct rq *source_rq = maxload.rq;
+		struct rq *target_rq = minload.rq;
 
+		/* get next eligible task from source_rq */
+		struct task_struct *p = get_next_task(); // TODO: fill in correct func
+
+		/* move task p from source_rq to target_rq
+		 * see sched_move_task() in core.c for details
+		 */
+		deactivate_task(source_rq, p, 0);
+		set_task_cpu(p, target_rq->cpu);
+		actovate_task(target_rq, p, 0);
+	} else {
+		return;
+	}
 }
