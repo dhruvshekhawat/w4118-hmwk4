@@ -622,10 +622,11 @@ static void check_preempt_equal_prio(struct rq *rq, struct task_struct *p)
 /*
  * Preempt the current task with a newly woken task if needed:
  */
-static void check_preempt_curr_rt(struct rq *rq, struct task_struct *p, int flags)
+static void check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int flags)
 {
-#ifdef CONFIG_SMP
-#endif
+	(void)rq;
+	(void)p;
+	(void)flags;
 }
 
 /*static struct sched_rt_entity *pick_next_grr_entity(struct rq *rq,
@@ -855,7 +856,7 @@ const struct sched_class sched_grr_class = {
 	.dequeue_task		= dequeue_task_grr,
 	.yield_task		= yield_task_grr,
 
-	.check_preempt_curr	=,
+	.check_preempt_curr	= check_preempt_curr_grr,
 
 	.pick_next_task		= pick_next_task_grr,
 	.put_prev_task		= put_prev_task_grr,
@@ -894,4 +895,4 @@ void print_grr_stats(struct seq_file *m, int cpu)
 	rcu_read_unlock();
 
 }
-#endif /* CONFIG_SCHED_DEBUG */
+i#endif /* CONFIG_SCHED_DEBUG */
