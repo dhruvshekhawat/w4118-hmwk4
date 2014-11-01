@@ -8376,12 +8376,21 @@ struct cgroup_subsys cpuacct_subsys = {
  */
 SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 {
+	int dest_cpu;
+	struct sched_domain *sd;
+
 	if (current_euid() != 0 && current_uid() != 0)
 		return -EACCES;
 	if (numCPU < 1 && numCPU >= NR_CPUS)
 		return -EINVAL;
 	if (group != 1 && group != 2)
 		return -EINVAL;
+
+	rcu_read_lock();
+	for_each_cpu(dest_cpu, sched_domain_span(sd)) {
+		printk(KERN_DEBUG "%d\n", dest_cpu);
+	}
+	rcu_read_unlock();
 
 	return 0;
 }

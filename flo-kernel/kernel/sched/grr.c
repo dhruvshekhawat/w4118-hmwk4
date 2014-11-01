@@ -795,3 +795,63 @@ void print_grr_stats(struct seq_file *m, int cpu)
 
 }
 #endif /* CONFIG_SCHED_DEBUG */
+
+struct load {
+	struct rq *rq;
+	int value;
+};
+
+static void grr_load_balance(void)
+{
+	unsigned long i;
+	unsigned long online_cpus;
+	struct load maxload;
+	struct load minload;
+
+	maxload.value = 0;
+	minload.value = 0;
+
+	/*
+	 * iterate through each CPU and
+	 * find the min and max load accros all CPUs
+	 */
+	for_each_online_cpu(i) {
+		/* get rq of current CPU */
+		struct rq *rq = cpu_rq(i);
+		/* get grr_rq of current CPU */
+		struct grr_rq *grr_rq = &rq->grr;
+		/* get nr of running jobs under the GRR policy */
+		unsigned long nr_running = grr_rq->grr_nr_running;
+
+		if (maxload.value < nr_running) {
+			maxload.value = nr_running;
+			maxload.rq = grr_rq;
+		}
+		if (minload.value > nr_running) {
+			minload.value = nr_running;
+			minload.rq = grr_rq;
+		}
+		online_cpus++;
+	}
+
+	/* given the min and max load
+	 * decide if you should load balance
+	 */
+	if (maxload.value > minload.value+1) {
+		/* worth load balancing */
+		struct rq *source_rq = maxload.rq;
+		struct rq *target_rq = minload.rq;
+
+		/* get next eligible task from source_rq */
+		struct task_struct *p = get_next_task(); // TODO: fill in correct func
+
+		/* move task p from source_rq to target_rq
+		 * see sched_move_task() in core.c for details
+		 */
+		deactivate_task(source_rq, p, 0);
+		set_task_cpu(p, target_rq->cpu);
+		actovate_task(target_rq, p, 0);
+	} else {
+		return;
+	}
+}
