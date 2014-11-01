@@ -436,26 +436,14 @@ void dec_rt_tasks(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 {
 }
 
-static void __enqueue_rt_entity(struct sched_rt_entity *rt_se, bool head)
-{
-}
-
-static void __dequeue_rt_entity(struct sched_rt_entity *rt_se)
-{
-}
-
-/*
- * Because the prio of an upper entry depends on the lower
- * entries, we must remove entries top - down.
- */
-static void dequeue_rt_stack(struct sched_rt_entity *rt_se)
-{
-}
-
 static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
 {
+	/*
+	 * Drop connection of this entity with runque but
+	 * reinitialize it to be reconnected later.
+	 */
+	list_del_init(&grr_se->task_queue);
 }
-
 
 static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
 {
@@ -477,8 +465,15 @@ enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 	inc_nr_running(rq);
 }
 
-static void dequeue_task_rt(struct rq *rq, struct task_struct *p, int flags)
+static void
+dequeue_task_grr(struct rq *rq, struct task_struct *p)
 {
+	struct sched_grr_entity *grr_se = &p->grr;
+
+	update_curr_grr(rq);
+	dequeue_grr_entity(grr_se);
+	dec_nr_running(rq);
+
 }
 
 /*
@@ -751,9 +746,8 @@ static unsigned int get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 const struct sched_class sched_grr_class = {
 	.next			= &fair_sched_class,
 	.enqueue_task		= enqueue_task_grr,
-	.dequeue_task		=,
+	.dequeue_task		= dequeue_task_grr,
 	.yield_task		=,
-	.yield_to_task		=,
 
 	.check_preempt_curr	=,
 
