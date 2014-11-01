@@ -441,8 +441,19 @@ static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
  * Adding/removing a task to/from a priority array:
  */
 static void
-enqueue_task_rt(struct rq *rq, struct task_struct *p, int flags)
+enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
+	struct sched_grr_entity *grr_se = &p->grr;
+
+	if (flags & ENQUEUE_WAKEUP)
+		grr_se->timeout = 0;
+
+	enqueue_grr_entity(grr_se, flags & ENQUEUE_HEAD);
+
+	if (!task_current(rq, p) && p->rt.nr_cpus_allowed > 1)
+		enqueue_pushable_task(rq, p);
+
+	inc_nr_running(rq);
 }
 
 static void dequeue_task_rt(struct rq *rq, struct task_struct *p, int flags)
@@ -612,8 +623,8 @@ void init_sched_rt_class(void)
  */
 static void switched_to_rt(struct rq *rq, struct task_struct *p)
 {
-#ifdef CONFIG_SMP
-#endif /* CONFIG_SMP */
+	(void)rq;
+	(void)p;
 }
 
 /*
@@ -693,7 +704,7 @@ static unsigned int get_rr_interval_grr(struct rq *rq, struct task_struct *task)
  */
 const struct sched_class sched_grr_class = {
 	.next			= &fair_sched_class,
-	.enqueue_task		=,
+	.enqueue_task		= enqueue_task_grr,
 	.dequeue_task		=,
 	.yield_task		=,
 	.yield_to_task		=,
@@ -705,20 +716,16 @@ const struct sched_class sched_grr_class = {
 
 #ifdef CONFIG_SMP
 	.select_task_rq		=,
-
-	.rq_online		=,
-	.rq_offline		=,
-
-	.task_waking		=,
+/*	.rq_online		=, */
+/*	.rq_offline		=, */
+/*	.switched_from		=, */
 #endif
 
 	.set_curr_task          = set_curr_task_grr,
 	.task_tick		= task_tick_grr,
-	.task_fork		=,
 
 	.prio_changed		= prio_changed_grr,
-	.switched_from		=,
-	.switched_to		=,
+	.switched_to		= switched_to_grr,
 
 	.get_rr_interval	= get_rr_interval_grr,
 
