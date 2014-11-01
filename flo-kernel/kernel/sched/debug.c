@@ -257,10 +257,11 @@ void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *rt_rq)
 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", #x, SPLIT_NS(grr_rq->x))
 
 	P(grr_nr_running);
+/*
 	P(grr_throttled);
 	PN(grr_time);
 	PN(grr_runtime);
-
+*/
 #undef PN
 #undef P
 }
@@ -328,7 +329,9 @@ static void print_cpu(struct seq_file *m, int cpu)
 	spin_lock_irqsave(&sched_debug_lock, flags);
 	print_cfs_stats(m, cpu);
 	print_rt_stats(m, cpu);
-
+#ifdef CONFIG_GRR
+	print_grr_stats(m, cpu);
+#endif
 	rcu_read_lock();
 	print_rq(m, rq, cpu);
 	rcu_read_unlock();
