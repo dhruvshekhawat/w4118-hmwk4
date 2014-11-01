@@ -150,16 +150,16 @@ static inline u64 sched_rt_period(struct rt_rq *rt_rq)
 {
 }
 
-typedef struct task_group *rt_rq_iter_t;
+typedef struct task_group *grr_rq_iter_t;
 
 static inline struct task_group *next_task_group(struct task_group *tg)
 {
 }
 
-#define for_each_rt_rq(rt_rq, iter, rq)					\
+#define for_each_grr_rq(grr_rq, iter, rq)					\
 	for (iter = container_of(&task_groups, typeof(*iter), list);	\
 		(iter = next_task_group(iter)) &&			\
-		(rt_rq = iter->rt_rq[cpu_of(rq)]);)
+		(grr_rq = iter->grr_rq[cpu_of(rq)]);)
 
 static inline void list_add_leaf_rt_rq(struct rt_rq *rt_rq)
 {
@@ -682,9 +682,17 @@ const struct sched_class sched_grr_class = {
 };
 
 #ifdef CONFIG_SCHED_DEBUG
-extern void print_rt_rq(struct seq_file *m, int cpu, struct rt_rq *rt_rq);
+extern void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq);
 
-void print_rt_stats(struct seq_file *m, int cpu)
+void print_grr_stats(struct seq_file *m, int cpu)
 {
+	grr_rq_iter_t iter;
+	struct grr_rq *grr_rq;
+
+	rcu_read_lock();
+	for_each_grr_rq(grr_rq, iter, cpu_rq(cpu))
+		print_grr_rq(m, cpu, grr_rq);
+	rcu_read_unlock();
+
 }
 #endif /* CONFIG_SCHED_DEBUG */

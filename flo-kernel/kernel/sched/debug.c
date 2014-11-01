@@ -242,6 +242,31 @@ void print_rt_rq(struct seq_file *m, int cpu, struct rt_rq *rt_rq)
 #undef P
 }
 
+#ifdef CONFIG_GRR
+void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *rt_rq)
+{
+#ifdef CONFIG_RT_GROUP_SCHED
+	SEQ_printf(m, "\ngrr_rq[%d]:%s\n", cpu, task_group_path(grr_rq->tg));
+#else
+	SEQ_printf(m, "\ngrr_rq[%d]:\n", cpu);
+#endif
+
+#define P(x) \
+	SEQ_printf(m, "  .%-30s: %Ld\n", #x, (long long)(grr_rq->x))
+#define PN(x) \
+	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", #x, SPLIT_NS(grr_rq->x))
+
+	P(grr_nr_running);
+	P(grr_throttled);
+	PN(grr_time);
+	PN(grr_runtime);
+
+#undef PN
+#undef P
+}
+#endif
+
+
 extern __read_mostly int sched_clock_running;
 
 static void print_cpu(struct seq_file *m, int cpu)
