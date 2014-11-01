@@ -136,10 +136,12 @@ extern struct cred init_cred;
 
 #ifdef CONFIG_GRR
 #define SCHED_NORMAL_OR_GRR SCHED_GRR
+#ifndef GRR_TIMESLICE
 #define GRR_TIMESLICE 100 * HZ / 1000
+#endif
 #define INIT_GRR \
-	.grr▸    ▸       = {▸    ▸       ▸       ▸       ▸       	\
-		.time_slice▸    = GRR_TIMESLICE,▸ 			\
+	.grr		= {						\
+		.time_slice	= GRR_TIMESLICE,			\
 	},
 #else
 #define SCHED_NORMAL_OR_GRR SCHED_NORMAL
@@ -171,7 +173,6 @@ extern struct cred init_cred;
 		.time_slice	= RR_TIMESLICE,				\
 		.nr_cpus_allowed = NR_CPUS,				\
 	},								\
-	INIT_GRR							\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	INIT_PUSHABLE_TASKS(tsk)					\
 	.ptraced	= LIST_HEAD_INIT(tsk.ptraced),			\

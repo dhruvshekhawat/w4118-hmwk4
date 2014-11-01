@@ -243,7 +243,7 @@ void print_rt_rq(struct seq_file *m, int cpu, struct rt_rq *rt_rq)
 }
 
 #ifdef CONFIG_GRR
-void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *rt_rq)
+void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq)
 {
 #ifdef CONFIG_RT_GROUP_SCHED
 	SEQ_printf(m, "\ngrr_rq[%d]:%s\n", cpu, task_group_path(grr_rq->tg));

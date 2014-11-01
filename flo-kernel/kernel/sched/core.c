@@ -1746,11 +1746,12 @@ static void __sched_fork(struct task_struct *p)
 }
 
 #ifdef CONFIG_GRR
-static inline is_grr_prio(struct task_struct *p)
+static inline int is_grr_prio(struct task_struct *p)
 {
 	if (p->policy == SCHED_GRR)
 		return 1;
 	return 0;
+}
 #endif
 
 /*

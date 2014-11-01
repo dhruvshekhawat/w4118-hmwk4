@@ -890,8 +890,10 @@ enum cpuacct_stat_index {
    for (class = sched_class_highest; class; class = class->next)
 
 extern const struct sched_class stop_sched_class;
-extern const struct sched_class rt_sched_class;
+#ifdef CONFIG_GRR
 extern const struct sched_class grr_sched_class;
+#endif
+extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
 
@@ -1189,9 +1191,15 @@ extern struct sched_entity *__pick_first_entity(struct cfs_rq *cfs_rq);
 extern struct sched_entity *__pick_last_entity(struct cfs_rq *cfs_rq);
 extern void print_cfs_stats(struct seq_file *m, int cpu);
 extern void print_rt_stats(struct seq_file *m, int cpu);
+#ifdef CONFIG_GRR
+extern void print_grr_stats(struct seq_file *m, int cpu);
+#endif
 
 extern void init_cfs_rq(struct cfs_rq *cfs_rq);
 extern void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq);
+#ifdef CONFIG_GRR
+extern void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq);
+#endif
 extern void unthrottle_offline_cfs_rqs(struct rq *rq);
 
 extern void account_cfs_bandwidth_used(int enabled, int was_enabled);
