@@ -34,8 +34,12 @@ static void destroy_rt_bandwidth(struct rt_bandwidth *rt_b)
 
 #define rt_entity_is_task(rt_se) (!(rt_se)->my_q)
 
-static inline struct task_struct *rt_task_of(struct sched_rt_entity *rt_se)
+static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
+#ifdef CONFIG_SCHED_DEBUG
+	WARN_ON_ONCE(!grr_entity_is_task(grr_se));
+#endif
+	return container_of(grr_se, struct task_struct, grr);
 }
 
 static inline struct rq *rq_of_rt_rq(struct rt_rq *rt_rq)
@@ -336,8 +340,29 @@ static int sched_rt_runtime_exceeded(struct rt_rq *rt_rq)
  * Update the current task's runtime statistics. Skip current tasks that
  * are not in our scheduling class.
  */
-static void update_curr_rt(struct rq *rq)
+static void update_curr_grr(struct rq *rq)
 {
+	struct task_struct *curr = rq->curr;
+	struct sched_grr_entity *grr_se = &curr->grr;
+	struct grr_rq *grr_rq = grr_rq_of_se(grr_se);
+	u64 delta_exec;
+
+	if (curr->sched_class != &grr_sched_class)
+		return;
+
+	delta_exec = rq->clock_task - curr->se.exec_start;
+	if (unlikely((s64)delta_exec < 0))
+		delta_exec = 0;
+
+	schedstat_set(curr->se.statistics.exec_max,
+		      max(curr->se.statistics.exec_max, delta_exec));
+
+	 curr->se.sum_exec_runtime += delta_exec;
+	 account_group_exec_runtime(curr, delta_exec);
+
+	 curr->se.exec_start = rq->clock_task;
+	 cpuacct_charge(curr, delta_exec);
+
 }
 
 #if defined CONFIG_SMP
@@ -505,18 +530,47 @@ static struct sched_rt_entity *pick_next_rt_entity(struct rq *rq,
 {
 }
 
-static struct task_struct *_pick_next_task_rt(struct rq *rq)
+static struct task_struct *_pick_next_task_grr(struct rq *rq)
 {
+	struct sched_grr_entity *grr_se;
+	struct task_struct *p;
+	struct grr_rq *grr_rq = &rq->grr;
+
+	if (!grr_rq->grr_nr_running)
+		return NULL;
+
+	do {
+		grr_se = pick_next_entity(grr_rq);
+		set_next_entity(grr_rq, grr_se);
+		grr_rq = group_grr_rq(grr_se);
+	} while (grr_rq);
+
+	p = grr_task_of(grr_se);
+	p->se.exec_start = rq->clock_task;
+
+	return p;
 }
 
-static struct task_struct *pick_next_task_rt(struct rq *rq)
+/*
+ * As we want a round robin we should put all of our task in a queue.
+ * Then the pick_next_task will be just get the head of this list
+ */
+static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
+	struct task_struct *p = _pick_next_task_grr(rq);
 #ifdef CONFIG_SMP
 #endif
 }
 
-static void put_prev_task_rt(struct rq *rq, struct task_struct *p)
+static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 {
+	/*
+	 * As we are round robin we should put the start
+	 * to 0 and update the current task
+	 */
+	update_curr_grr();
+	p->se.exec_start = 0;
+
 }
 
 #ifdef CONFIG_SMP
@@ -711,8 +765,8 @@ const struct sched_class sched_grr_class = {
 
 	.check_preempt_curr	=,
 
-	.pick_next_task		=,
-	.put_prev_task		=,
+	.pick_next_task		= pick_next_task_grr,
+	.put_prev_task		= put_prev_task_grr,
 
 #ifdef CONFIG_SMP
 	.select_task_rq		=,
