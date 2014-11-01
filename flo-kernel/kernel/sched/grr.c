@@ -749,3 +749,43 @@ void print_grr_stats(struct seq_file *m, int cpu)
 
 }
 #endif /* CONFIG_SCHED_DEBUG */
+
+struct load {
+	struct rq *rq;
+	int value;
+};
+
+static void grr_load_balance(void)
+{
+	struct load maxload;
+	struct load minload;
+
+	maxload.value = 0;
+	minload.value = 0;
+
+	/*
+	 * iterate through each CPU and
+	 * find the min and max load for each group
+	 */
+	for_each_online_cpu(i) {
+		/* get rq of current CPU */
+		struct rq *rq = cpu_rq(i);
+		/* get grr_rq of current CPU */
+		struct grr_rq *grr_rq = &rq->grr;
+		/* get nr of running jobs under the GRR policy */
+		unsigned long nr_running = grr_rq->grr_nr_running;
+
+		if (maxload.value < nr_running) {
+			maxload.value = nr_running;
+			maxload.rq = grr_rq;
+		} else if (minload.value > nr_running) {
+			minload.value = nr_running;
+			minload.rq = grr_rq;
+		}
+	}
+
+	/* check if given the min and max load
+	 * you should load balance
+	 */
+
+}
