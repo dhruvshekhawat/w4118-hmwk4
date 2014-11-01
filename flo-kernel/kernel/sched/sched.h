@@ -79,6 +79,10 @@ extern struct mutex sched_domains_mutex;
 
 struct cfs_rq;
 struct rt_rq;
+#ifdef CONFIG_GRR
+struct grr_rq;
+#endif
+
 
 static LIST_HEAD(task_groups);
 
@@ -311,6 +315,41 @@ struct rt_rq {
 #endif
 };
 
+#ifdef CONFIG_GRR
+/* GRR classes' related field in a runqueue: */
+struct grr_rq {
+	struct rt_prio_array active;
+	unsigned long grr_nr_running;
+#if defined CONFIG_SMP || defined CONFIG_RT_GROUP_SCHED
+	struct {
+		int curr; /* highest queued rt task prio */
+#ifdef CONFIG_SMP
+		int next; /* next highest */
+#endif
+	} highest_prio;
+#endif
+#ifdef CONFIG_SMP
+	unsigned long grr_nr_migratory;
+	unsigned long grr_nr_total;
+	int overloaded;
+	struct plist_head pushable_tasks;
+#endif
+	int grr_throttled;
+	u64 grr_time;
+	u64 grr_runtime;
+	/* Nests inside the rq lock: */
+	raw_spinlock_t grr_runtime_lock;
+
+#ifdef CONFIG_RT_GROUP_SCHED
+	unsigned long grr_nr_boosted;
+
+	struct rq *rq;
+	struct list_head leaf_grr_rq_list;
+	struct task_group *tg;
+#endif
+};
+#endif
+
 #ifdef CONFIG_SMP
 
 /*
@@ -372,6 +411,9 @@ struct rq {
 
 	struct cfs_rq cfs;
 	struct rt_rq rt;
+#ifdef CONFIG_GRR
+	struct grr_rq grr;
+#endif
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
