@@ -319,14 +319,6 @@ struct rt_rq {
 /* GRR classes' related field in a runqueue: */
 struct grr_rq {
 	unsigned long grr_nr_running;
-#if defined CONFIG_SMP || defined CONFIG_RT_GROUP_SCHED
-	struct {
-		int curr; /* highest queued rt task prio */
-#ifdef CONFIG_SMP
-		int next; /* next highest */
-#endif
-	} highest_prio;
-#endif
 #ifdef CONFIG_SMP
 	unsigned long grr_nr_migratory;
 	unsigned long grr_nr_total;
@@ -343,7 +335,7 @@ struct grr_rq {
 	unsigned long grr_nr_boosted;
 
 	struct rq *rq;
-	struct list_head leaf_grr_rq_list;
+	struct list_head task_queue;
 	struct task_group *tg;
 #endif
 };
@@ -420,6 +412,9 @@ struct rq {
 #endif
 #ifdef CONFIG_RT_GROUP_SCHED
 	struct list_head leaf_rt_rq_list;
+#endif
+#ifdef CONFIG_GRR
+	struct list_head leaf_grr_rq_list;
 #endif
 
 	/*
