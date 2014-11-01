@@ -621,24 +621,70 @@ static void switched_to_rt(struct rq *rq, struct task_struct *p)
  * us to initiate a push or pull.
  */
 static void
-prio_changed_rt(struct rq *rq, struct task_struct *p, int oldprio)
+prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
 {
+	(void)rq;
+	(void)p;
+	(void)oldprio;
 }
 
 static void watchdog(struct rq *rq, struct task_struct *p)
 {
+	unsigned long soft, hard;
+
+	/* max may change after cur was read, this will be fixed next tick */
+	soft = task_rlimit(p, RLIMIT_RTTIME);
+	hard = task_rlimit_max(p, RLIMIT_RTTIME);
+
+	if (soft != RLIM_INFINITY) {
+		unsigned long next;
+
+		p->grr.timeout++;
+		next = DIV_ROUND_UP(min(soft, hard), USEC_PER_SEC/HZ);
+		if (p->grr.timeout > next)
+			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
+	}
 }
 
-static void task_tick_rt(struct rq *rq, struct task_struct *p, int queued)
+static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 {
+	struct sched_grr_entity *grr_se = &p->grr;
+
+	update_curr_grr(rq);
+
+	watchdog(rq, p);
+
+	if (--p->grr.time_slice)
+		return;
+
+	p->grr.time_slice = GRR_TIMESLICE;
+
+	/*
+	 * Requeue to the end of queue if we (and all of our ancestors) are the
+	 * only element on the queue
+	 */
+	for_each_sched__entity(grr_se) {
+		if (grr_se->run_list.prev != grr_se->run_list.next) {
+			requeue_task_grr(rq, p, 0);
+			set_tsk_need_resched(p);
+			return;
+		}
+	}
 }
 
-static void set_curr_task_rt(struct rq *rq)
+static void set_curr_task_grr(struct rq *rq)
 {
+	struct task_struct *p = rq->curr;
+
+	p->se.exec_start = rq->clock_task;
+
+	/* The running task is never eligible for pushing */
+	dequeue_pushable_task(rq, p);
 }
 
-static unsigned int get_rr_interval_rt(struct rq *rq, struct task_struct *task)
+static unsigned int get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 {
+	return GRR_TIMESLICE;
 }
 
 
@@ -647,32 +693,32 @@ static unsigned int get_rr_interval_rt(struct rq *rq, struct task_struct *task)
  */
 const struct sched_class sched_grr_class = {
 	.next			= &fair_sched_class,
-	.enqueue_task		= enqueue_task_grr,
-	.dequeue_task		= dequeue_task_grr,
-	.yield_task		= yield_task_grr,
-	.yield_to_task		= yield_to_task_grr,
+	.enqueue_task		=,
+	.dequeue_task		=,
+	.yield_task		=,
+	.yield_to_task		=,
 
-	.check_preempt_curr	= check_preempt_wakeup,
+	.check_preempt_curr	=,
 
-	.pick_next_task		= pick_next_task_grr,
-	.put_prev_task		= put_prev_task_grr,
+	.pick_next_task		=,
+	.put_prev_task		=,
 
 #ifdef CONFIG_SMP
-	.select_task_rq		= select_task_rq_grr,
+	.select_task_rq		=,
 
-	.rq_online		= rq_online_grr,
-	.rq_offline		= rq_offline_grr,
+	.rq_online		=,
+	.rq_offline		=,
 
-	.task_waking		= task_waking_grr,
+	.task_waking		=,
 #endif
 
 	.set_curr_task          = set_curr_task_grr,
 	.task_tick		= task_tick_grr,
-	.task_fork		= task_fork_grr,
+	.task_fork		=,
 
 	.prio_changed		= prio_changed_grr,
-	.switched_from		= switched_from_grr,
-	.switched_to		= switched_to_grr,
+	.switched_from		=,
+	.switched_to		=,
 
 	.get_rr_interval	= get_rr_interval_grr,
 

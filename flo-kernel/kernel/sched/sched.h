@@ -318,7 +318,6 @@ struct rt_rq {
 #ifdef CONFIG_GRR
 /* GRR classes' related field in a runqueue: */
 struct grr_rq {
-	struct rt_prio_array active;
 	unsigned long grr_nr_running;
 #if defined CONFIG_SMP || defined CONFIG_RT_GROUP_SCHED
 	struct {
