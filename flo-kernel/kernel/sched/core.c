@@ -7129,10 +7129,19 @@ void __init sched_init(void)
 
 	calc_load_update = jiffies + LOAD_FREQ;
 
+#ifdef CONFIG_GRR
+#ifdef CONFIG_GRR_AT_BOOT_UP
+	/*
+	 * During early bootup we pretend to be a grr task:
+	 */
+	current->sched_class = &grr_sched_class;
+#endif
+#else
 	/*
 	 * During early bootup we pretend to be a normal task:
 	 */
 	current->sched_class = &fair_sched_class;
+#endif
 
 #ifdef CONFIG_SMP
 	zalloc_cpumask_var(&sched_domains_tmpmask, GFP_NOWAIT);
