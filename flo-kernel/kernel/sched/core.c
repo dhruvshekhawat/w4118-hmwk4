@@ -1803,8 +1803,7 @@ void sched_fork(struct task_struct *p)
 		p->sched_class = &grr_sched_class;
 	else
 #endif
-
-		/* check grr_prio */
+	/* check grr_prio */
 	if (!rt_prio(p->prio))
 		p->sched_class = &fair_sched_class;
 
@@ -3888,6 +3887,11 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 	if (running)
 		p->sched_class->put_prev_task(rq, p);
 
+#ifdef CONFIG_GRR
+	if (is_grr_prio(p))
+		p->sched_class = &grr_sched_class;
+	else
+#endif
 	if (rt_prio(prio))
 		p->sched_class = &rt_sched_class;
 	else
@@ -3905,6 +3909,7 @@ out_unlock:
 	__task_rq_unlock(rq);
 }
 #endif
+
 void set_user_nice(struct task_struct *p, long nice)
 {
 	int old_prio, delta, on_rq;
@@ -4080,6 +4085,11 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	p->normal_prio = normal_prio(p);
 	/* we are holding p->pi_lock already */
 	p->prio = rt_mutex_getprio(p);
+#ifdef CONFIG_GRR
+	if (is_grr_prio(p))
+		p->sched_class = &grr_sched_class;
+	else
+#endif
 	if (rt_prio(p->prio))
 		p->sched_class = &rt_sched_class;
 	else
@@ -4128,6 +4138,9 @@ recheck:
 
 		if (policy != SCHED_FIFO && policy != SCHED_RR &&
 				policy != SCHED_NORMAL && policy != SCHED_BATCH &&
+#ifdef CONFIG_GRR
+				policy != SCHED_GRR &&
+#endif
 				policy != SCHED_IDLE)
 			return -EINVAL;
 	}
