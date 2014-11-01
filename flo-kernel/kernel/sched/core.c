@@ -722,6 +722,9 @@ static void set_load_weight(struct task_struct *p)
 	load->inv_weight = prio_to_wmult[prio];
 }
 
+/*
+ * NOTE: The caller must hold the queue lock.
+ */
 static void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	update_rq_clock(rq);
@@ -7039,6 +7042,9 @@ void __init sched_init(void)
 		rq->calc_load_update = jiffies + LOAD_FREQ;
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt, rq);
+#ifdef CONFIG_GRR
+		init_grr_rq(&rq->grr, rq);
+#endif
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
@@ -7126,10 +7132,19 @@ void __init sched_init(void)
 
 	calc_load_update = jiffies + LOAD_FREQ;
 
+#ifdef CONFIG_GRR
+#ifdef CONFIG_GRR_AT_BOOT_UP
+	/*
+	 * During early bootup we pretend to be a grr task:
+	 */
+	current->sched_class = &grr_sched_class;
+#endif
+#else
 	/*
 	 * During early bootup we pretend to be a normal task:
 	 */
 	current->sched_class = &fair_sched_class;
+#endif
 
 #ifdef CONFIG_SMP
 	zalloc_cpumask_var(&sched_domains_tmpmask, GFP_NOWAIT);

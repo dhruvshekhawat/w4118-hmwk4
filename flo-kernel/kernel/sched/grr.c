@@ -24,8 +24,10 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
 {
 }
 
-void init_rt_rq(struct rt_rq *rt_rq, struct rq *rq)
+void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
 {
+	INIT_LIST_HEAD(&grr_rq->queue);
+	grr_rq->grr_nr_running = 0;
 }
 
 static void destroy_rt_bandwidth(struct rt_bandwidth *rt_b)
@@ -119,10 +121,6 @@ static void dequeue_pushable_task(struct rq *rq, struct task_struct *p)
 }
 
 #else
-
-static inline void enqueue_pushable_task(struct rq *rq, struct task_struct *p)
-{
-}
 
 static inline void dequeue_pushable_task(struct rq *rq, struct task_struct *p)
 {
@@ -454,12 +452,17 @@ static void dequeue_rt_stack(struct sched_rt_entity *rt_se)
 {
 }
 
-static void enqueue_rt_entity(struct sched_rt_entity *rt_se, bool head)
+static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
 {
 }
 
-static void dequeue_rt_entity(struct sched_rt_entity *rt_se)
+
+static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
 {
+	if (head)
+		list_add(&grr_se->task_queue, queue);
+	else
+		list_add_tail(&grr_se->task_queue, queue);
 }
 
 /*
@@ -470,14 +473,7 @@ enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 
-	if (flags & ENQUEUE_WAKEUP)
-		grr_se->timeout = 0;
-
 	enqueue_grr_entity(grr_se, flags & ENQUEUE_HEAD);
-
-	if (!task_current(rq, p) && p->rt.nr_cpus_allowed > 1)
-		enqueue_pushable_task(rq, p);
-
 	inc_nr_running(rq);
 }
 
@@ -551,10 +547,6 @@ static struct task_struct *_pick_next_task_grr(struct rq *rq)
 	return p;
 }
 
-/*
- * As we want a round robin we should put all of our task in a queue.
- * Then the pick_next_task will be just get the head of this list
- */
 static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
 	struct task_struct *p = _pick_next_task_grr(rq);
