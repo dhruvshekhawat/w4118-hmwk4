@@ -151,7 +151,7 @@ static void create_kthread(struct kthread_create_info *create)
 
 /**
  * kthread_create_on_node - create a kthread.
- * @threadfn: the function to run until signal_pending(current).
+ * @threadfn: the function to run until signal_pending(curirent).
  * @data: data ptr for @threadfn.
  * @node: memory node number.
  * @namefmt: printf-style name for the thread.
@@ -203,7 +203,11 @@ struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
 		 * root may have changed our (kthreadd's) priority or CPU mask.
 		 * The kernel thread should not inherit these properties.
 		 */
+#ifdef CONFIG_GRR
+		sched_setscheduler_nocheck(create.result, SCHED_GRR, &param);
+#else
 		sched_setscheduler_nocheck(create.result, SCHED_NORMAL, &param);
+#endif
 		set_cpus_allowed_ptr(create.result, cpu_all_mask);
 	}
 	return create.result;
