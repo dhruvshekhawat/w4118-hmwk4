@@ -1249,6 +1249,16 @@ struct sched_rt_entity {
 #endif
 };
 
+#ifdef CONFIG_GRR
+struct sched_grr_entity {
+	struct list_head run_list;
+	unsigned long timeout;
+	unsigned int time_slice;
+	int nr_cpus_allowed;
+	struct sched_grr_entity *back;
+};
+#endif
+
 /*
  * default timeslice is 100 msecs (used only for SCHED_RR tasks).
  * Timeslices get refilled after they expire.
@@ -1282,6 +1292,9 @@ struct task_struct {
 	const struct sched_class *sched_class;
 	struct sched_entity se;
 	struct sched_rt_entity rt;
+#ifdef CONFIG_GRR
+	struct sched_grr_entity grr;
+#endif
 
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	/* list of struct preempt_notifier: */
