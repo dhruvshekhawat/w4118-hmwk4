@@ -551,6 +551,10 @@ static struct task_struct *_pick_next_task_grr(struct rq *rq)
 	return p;
 }
 
+/*
+ * As we want a round robin we should put all of our task in a queue.
+ * Then the pick_next_task will be just get the head of this list
+ */
 static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
 	struct task_struct *p = _pick_next_task_grr(rq);

@@ -335,7 +335,7 @@ struct grr_rq {
 	unsigned long grr_nr_boosted;
 
 	struct rq *rq;
-	struct list_head task_queue;
+	struct list_head queue;
 	struct task_group *tg;
 #endif
 };
