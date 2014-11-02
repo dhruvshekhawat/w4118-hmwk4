@@ -9,24 +9,10 @@
 #define BASE_WRR_TIME_SLICE (100 * HZ / 1000) /* time slice of 100ms */
 
 struct load {
+	unsigned long nr_running;
 	struct rq *rq;
-	int value;
 	int cpu;
 };
-
-static struct task_struct *get_next_grr_task(struct rq *rq)
-{
-	struct task_struct *p;
-
-	if (rq == NULL)
-		return NULL;
-
-	if (list_empty(&rq->grr.queue))
-		return NULL;
-	
-//	list_first_entry(p, struct task_struct, &(rq->grr.queue));
-	return p;
-}
 
 static int can_move_grr_task(struct task_struct *p,
 			     struct rq *source,
@@ -46,17 +32,19 @@ static int can_move_grr_task(struct task_struct *p,
 
 static void grr_load_balance(void)
 {
+	int cpus_online;
 	unsigned long i;
-	struct rq *source_rq;
-	struct rq *target_rq;
 	struct load maxload;
 	struct load minload;
+	struct rq *source_rq;
+	struct rq *target_rq;
 	struct task_struct *p;
-	int cpus_online;
+	struct sched_grr_entity *grr_se;
 
-	//trace_printk("GRR: grr_load_balance\n");
 	maxload.value = 0;
 	minload.value = 0;
+
+	printk(KERN_ERR "loadbalancing: START\n");
 
 	/*
 	 * iterate through each CPU and
@@ -70,13 +58,13 @@ static void grr_load_balance(void)
 		/* get nr of running jobs under the GRR policy */
 		unsigned long nr_running = grr_rq->grr_nr_running;
 
-		if (maxload.value < nr_running) {
-			maxload.value = nr_running;
+		if (maxload.nr_running < nr_running) {
+			maxload.nr_running = nr_running;
 			maxload.rq = rq;
 			maxload.cpu = i;
 		}
-		if (minload.value > nr_running) {
-			minload.value = nr_running;
+		if (minload.nr_running > nr_running) {
+			minload.nr_running = nr_running;
 			minload.rq = rq;
 			minload.cpu = i;
 		}
@@ -86,7 +74,7 @@ static void grr_load_balance(void)
 	/* given the min and max load
 	 * decide if you should load balance
 	 */
-	if (maxload.value > minload.value+1) {
+	if (maxload.nr_running > minload.nr_running+1) {
 		/* worth load balancing */
 		/* check __migrate_task() from core.c */
 		source_rq = maxload.rq;
@@ -96,30 +84,49 @@ static void grr_load_balance(void)
 		double_rq_lock(source_rq, target_rq);
 		rcu_read_lock();
 
-		/* TODO: maybe put the next few lines in a loop
-		 * until you find an eligible task to be moved??? */
+		/* find next movable task from source_rq */
+		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
+			/* get next eligible task from source_rq */
+			p = grr_task_of(grr_se);
 
-		/* get next eligible task from source_rq */
-		p = get_next_grr_task(source_rq);
+			if (p == NULL)
+				goto unlock;
 
-		if (p == NULL)
+			if (!can_move_grr_task(p, source_rq, target_rq)) {
+				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
+								p->comm,
+								source_rq->cpu,
+								target_rq->cpu);
+				continue;
+			}
+
+			/* move task p from source_rq to target_rq
+			 * see sched_move_task() in core.c for details
+			 */
+			deactivate_task(source_rq, p, 0);
+			set_task_cpu(p, target_rq->cpu);
+			activate_task(target_rq, p, 0);
+
+			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
+							p->comm,
+							source_rq->cpu,
+							target_rq->cpu);
+
 			goto unlock;
+		}
 
-		if (!can_move_grr_task(p, source_rq, target_rq))
-			goto unlock;
-
-		/* move task p from source_rq to target_rq
-		 * see sched_move_task() in core.c for details
-		 */
-		deactivate_task(source_rq, p, 0);
-		set_task_cpu(p, target_rq->cpu);
-		activate_task(target_rq, p, 0);
-
+		printk(KERN_ERR "no task moved; maxload=%d, minload=%d\n",
+						maxload.nr_running,
+						minload.nr_running);
 		goto unlock;
 	}
+	printk(KERN_ERR "no need to loadbalance; maxload=%d, minload=%d\n",
+					maxload.nr_running,
+					minload.nr_running);
 	return;
 
 unlock:
+	printk(KERN_ERR "loadbalancing: END\n");
 	rcu_read_unlock();
 	double_rq_unlock(source_rq, target_rq);
 }
@@ -227,7 +234,7 @@ static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 	struct grr_rq *grr_rq = &rq->grr;
-	
+
 	//trace_printk("GRR: requeue_task_grr\n");
 	list_move_tail(&grr_se->task_queue, &grr_rq->queue);
 }
@@ -376,10 +383,10 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 
 	p->grr.time_slice = GRR_TIMESLICE;
 
-/*	
+/*
 	 * Requeue to the end of queue if we (and all of our ancestors) are the
 	 * only element on the queue
-	 
+
 	for_each_sched_entity(grr_se) {
 		if (grr_se->run_list.prev != grr_se->run_list.next) {
 			requeue_task_grr(rq, p, 0);
