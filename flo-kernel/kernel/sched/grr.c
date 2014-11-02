@@ -54,7 +54,7 @@ static void grr_load_balance(void)
 	struct task_struct *p;
 	int cpus_online;
 
-	trace_printk("GRR: grr_load_balance\n");
+	//trace_printk("GRR: grr_load_balance\n");
 	maxload.value = 0;
 	minload.value = 0;
 
@@ -126,7 +126,7 @@ unlock:
 
 void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
 {
-	trace_printk("GRR: init_grr_rq\n");
+	//trace_printk("GRR: init_grr_rq\n");
 	INIT_LIST_HEAD(&grr_rq->queue);
 	grr_rq->grr_nr_running = 0;
 }
@@ -160,7 +160,7 @@ static void update_curr_grr(struct rq *rq)
 	struct task_struct *curr = rq->curr;
 	u64 delta_exec;
 
-	trace_printk("GRR: update_curr_grr\n");
+	//trace_printk("GRR: update_curr_grr\n");
 	if (curr->sched_class != &grr_sched_class)
 		return;
 
@@ -181,7 +181,7 @@ static void update_curr_grr(struct rq *rq)
 
 static void dequeue_grr_entity(struct sched_grr_entity *grr_se)
 {
-	trace_printk("GRR: dequeue_grr_entity\n");
+	//trace_printk("GRR: dequeue_grr_entity\n");
 	/*
 	 * Drop connection of this entity with runque but
 	 * reinitialize it to be reconnected later.
@@ -191,7 +191,7 @@ static void dequeue_grr_entity(struct sched_grr_entity *grr_se)
 
 static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
 {
-	trace_printk("GRR: enqueue_grr_entity\n");
+	//trace_printk("GRR: enqueue_grr_entity\n");
 	if (head)
 		list_add(&grr_se->task_queue, &grr_se->task_queue);
 	else
@@ -206,7 +206,7 @@ enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 
-	trace_printk("GRR: enqueue_task_grr\n");
+	//trace_printk("GRR: enqueue_task_grr\n");
 	enqueue_grr_entity(grr_se, flags & ENQUEUE_HEAD);
 	inc_nr_running(rq);
 }
@@ -216,7 +216,7 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 
-	trace_printk("GRR: dequeue_task_grr\n");
+	//trace_printk("GRR: dequeue_task_grr\n");
 	update_curr_grr(rq);
 	dequeue_grr_entity(grr_se);
 	dec_nr_running(rq);
@@ -228,13 +228,13 @@ static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 	struct sched_grr_entity *grr_se = &p->grr;
 	struct grr_rq *grr_rq = &rq->grr;
 	
-	trace_printk("GRR: requeue_task_grr\n");
+	//trace_printk("GRR: requeue_task_grr\n");
 	list_move_tail(&grr_se->task_queue, &grr_rq->queue);
 }
 
 static void yield_task_grr(struct rq *rq)
 {
-	trace_printk("GRR: yield_task_grr\n");
+	//trace_printk("GRR: yield_task_grr\n");
 	requeue_task_grr(rq,rq->curr,0);
 }
 
@@ -248,7 +248,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	unsigned long orig_weight = cpu_rq(orig_cpu)->grr.grr_nr_total;
 	unsigned long smallest_rq_weight = orig_weight;
 
-	trace_printk("GRR: select_task_rq_grr\n");
+	//trace_printk("GRR: select_task_rq_grr\n");
 	if (p->grr.nr_cpus_allowed == 1)
 		return orig_cpu;
 
@@ -275,7 +275,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
  */
 static void check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int flags)
 {
-	trace_printk("GRR: check_preempt_curr_grr\n");
+	//trace_printk("GRR: check_preempt_curr_grr\n");
 	(void)rq;
 	(void)p;
 	(void)flags;
@@ -291,7 +291,7 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 	struct task_struct *p;
 	struct grr_rq *grr_rq  = &rq->grr;
 
-	trace_printk("GRR: pick_next_task_grr\n");
+	//trace_printk("GRR: pick_next_task_grr\n");
 	if (unlikely(!grr_rq->grr_nr_running))
 		return NULL;
 
@@ -305,7 +305,7 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 
 static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 {
-	trace_printk("GRR: put_prev_task_grr\n");
+	//trace_printk("GRR: put_prev_task_grr\n");
 	/*
 	 * As we are round robin we should put the start
 	 * to 0 and update the current task
@@ -322,9 +322,14 @@ static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
  */
 static void switched_to_grr(struct rq *rq, struct task_struct *p)
 {
-	trace_printk("GRR: switched_to_grr\n");
-	(void)rq;
-	(void)p;
+	//trace_printk("GRR: switched_to_grr\n");
+	/*
+	 * If the running proccess in not real time then
+	 * this process must execute
+	 */
+	if (!rt_task(rq->curr))
+		resched_task(rq->curr);
+
 }
 
 /*
@@ -334,7 +339,7 @@ static void switched_to_grr(struct rq *rq, struct task_struct *p)
 static void
 prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
 {
-	trace_printk("GRR: prio_changed_grr\n");
+	//trace_printk("GRR: prio_changed_grr\n");
 	(void)rq;
 	(void)p;
 	(void)oldprio;
@@ -344,7 +349,7 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 {
 	unsigned long soft, hard;
 
-	trace_printk("GRR: watchdog\n");
+	//trace_printk("GRR: watchdog\n");
 	/* max may change after cur was read, this will be fixed next tick */
 	soft = task_rlimit(p, RLIMIT_RTTIME);
 	hard = task_rlimit_max(p, RLIMIT_RTTIME);
@@ -361,7 +366,7 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 
 static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 {
-	trace_printk("GRR: task_tick_grr\n");
+	//trace_printk("GRR: task_tick_grr\n");
 	update_curr_grr(rq);
 
 	watchdog(rq, p);
@@ -389,13 +394,13 @@ static void set_curr_task_grr(struct rq *rq)
 {
 	struct task_struct *p = rq->curr;
 
-	trace_printk("GRR: set_curr_task_grr\n");
+	//trace_printk("GRR: set_curr_task_grr\n");
 	p->se.exec_start = rq->clock_task;
 }
 
 static unsigned int get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 {
-	trace_printk("GRR: get_rr_interval_grr");
+	//trace_printk("GRR: get_rr_interval_grr");
 	return GRR_TIMESLICE;
 }
 
@@ -439,6 +444,6 @@ extern void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq);
 
 void print_grr_stats(struct seq_file *m, int cpu)
 {
-	trace_printk("GRR: task_tick_grr\n");
+	//trace_printk("GRR: task_tick_grr\n");
 }
 #endif /* CONFIG_SCHED_DEBUG */
