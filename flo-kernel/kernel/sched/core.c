@@ -4097,7 +4097,7 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	/* we are holding p->pi_lock already */
 	p->prio = rt_mutex_getprio(p);
 #ifdef CONFIG_GRR
-	if (is_grr_prio(p)) {
+	if (is_grr_prio(p) &&  p->sched_class != &grr_sched_class) {
 		p->sched_class = &grr_sched_class;
 		printk(KERN_ERR "change class\n");
 	}

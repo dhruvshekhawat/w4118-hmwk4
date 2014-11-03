@@ -6,15 +6,17 @@
 
 #include <linux/slab.h>
 
-#define BASE_WRR_TIME_SLICE (100 * HZ / 1000) /* time slice of 100ms */
+static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
+{
+	return container_of(grr_se, struct task_struct, grr);
+}
 
+#ifdef CONFIG_SMP
 struct load {
 	unsigned long nr_running;
 	struct rq *rq;
 	int cpu;
 };
-
-#ifdef CONFIG_SMP
 
 static int can_move_grr_task(struct task_struct *p,
 			     struct rq *source,
@@ -31,19 +33,7 @@ static int can_move_grr_task(struct task_struct *p,
 		return 0;
 	return 1;
 }
-#endif
 
-#define grr_entity_is_task(rt_se) (!(rt_se)->my_q)
-
-static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
-{
-/*#ifdef CONFIG_SCHED_DEBUG
-	WARN_ON_ONCE(!grr_entity_is_task(grr_se));
-#endif*/
-	return container_of(grr_se, struct task_struct, grr);
-}
-
-#ifdef CONFIG_SMP
 static void grr_load_balance(void)
 {
 	int cpus_online;
@@ -58,7 +48,7 @@ static void grr_load_balance(void)
 	maxload.nr_running = 0;
 	minload.nr_running = 0;
 
-	printk(KERN_ERR "loadbalancing: START\n");
+	//printk(KERN_ERR "loadbalancing: START\n");
 
 	/*
 	 * iterate through each CPU and
@@ -144,7 +134,39 @@ unlock:
 	rcu_read_unlock();
 	double_rq_unlock(source_rq, target_rq);
 }
-#endif
+
+static int
+select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
+{
+	int i;
+	int orig_cpu = task_cpu(p);
+	struct rq *rq;
+	int smallest_rq = orig_cpu;
+	unsigned long orig_weight = cpu_rq(orig_cpu)->grr.grr_nr_total;
+	unsigned long smallest_rq_weight = orig_weight;
+
+	//trace_printk("GRR: select_task_rq_grr\n");
+	if (p->grr.nr_cpus_allowed == 1)
+		return orig_cpu;
+
+	rq = cpu_rq(orig_cpu);
+
+	/*
+	 * Here load balancing should take place
+	 */
+
+	for_each_online_cpu(i) {
+		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
+		if (!cpumask_test_cpu(i, &p->cpus_allowed))
+			continue;
+		if (grr_rq->grr_nr_total < smallest_rq_weight) {
+			smallest_rq_weight = grr_rq->grr_nr_total;
+			smallest_rq = i;
+		}
+	}
+	return smallest_rq;
+}
+#endif /* CONFIG_SMP */
 
 void init_grr_rq(struct grr_rq *grr_rq)
 {
@@ -297,40 +319,6 @@ static void yield_task_grr(struct rq *rq)
 	requeue_task_grr(rq,rq->curr,0);
 }
 
-#ifdef CONFIG_SMP
-static int
-select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
-{
-	int i;
-	int orig_cpu = task_cpu(p);
-	struct rq *rq;
-	int smallest_rq = orig_cpu;
-	unsigned long orig_weight = cpu_rq(orig_cpu)->grr.grr_nr_total;
-	unsigned long smallest_rq_weight = orig_weight;
-
-	//trace_printk("GRR: select_task_rq_grr\n");
-	if (p->grr.nr_cpus_allowed == 1)
-		return orig_cpu;
-
-	rq = cpu_rq(orig_cpu);
-
-	/*
-	 * Here load balancing should take place
-	 */
-
-	for_each_online_cpu(i) {
-		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
-		if (!cpumask_test_cpu(i, &p->cpus_allowed))
-			continue;
-		if (grr_rq->grr_nr_total < smallest_rq_weight) {
-			smallest_rq_weight = grr_rq->grr_nr_total;
-			smallest_rq = i;
-		}
-	}
-	return smallest_rq;
-}
-#endif
-
 /*
  * Preempt the current task with a newly woken task if needed:
  */
@@ -362,7 +350,7 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 		printk(KERN_ERR "GOT YAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 		return NULL;
 	}
-	printk(KERN_ERR "Taks: %s\n", p->comm);
+//	printk(KERN_ERR "Taks: %s\n", p->comm);
 	p->se.exec_start = rq->clock;
 //	printk(KERN_ERR "return head\n");
 	return p;
@@ -416,7 +404,7 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 {
 	unsigned long soft, hard;
 
-	printk("GRR: watchdog\n");
+//	printk("GRR: watchdog\n");
 	/* max may change after cur was read, this will be fixed next tick */
 	soft = task_rlimit(p, RLIMIT_RTTIME);
 	hard = task_rlimit_max(p, RLIMIT_RTTIME);
@@ -424,10 +412,10 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 	if (soft != RLIM_INFINITY) {
 		unsigned long next;
 
+		printk(KERN_ERR "Why are you here: %s\n", p->comm);
 		p->grr.timeout++;
 		next = DIV_ROUND_UP(min(soft, hard), USEC_PER_SEC/HZ);
 		if (p->grr.timeout > next) {
-			printk(KERN_ERR "watchdog: %s\n", p->comm);
 			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
 		}
 	}
@@ -444,19 +432,6 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 		return;
 
 	p->grr.time_slice = GRR_TIMESLICE;
-
-/*
-	 * Requeue to the end of queue if we (and all of our ancestors) are the
-	 * only element on the queue
-
-	for_each_sched_entity(grr_se) {
-		if (grr_se->run_list.prev != grr_se->run_list.next) {
-			requeue_task_grr(rq, p, 0);
-			set_tsk_need_resched(p);
-			return;
-		}
-	}
-*/
 }
 
 static void set_curr_task_grr(struct rq *rq)
@@ -483,27 +458,17 @@ const struct sched_class grr_sched_class = {
 	.enqueue_task		= enqueue_task_grr,
 	.dequeue_task		= dequeue_task_grr,
 	.yield_task		= yield_task_grr,
-
 	.check_preempt_curr	= check_preempt_curr_grr,
-
 	.pick_next_task		= pick_next_task_grr,
 	.put_prev_task		= put_prev_task_grr,
-
 #ifdef CONFIG_SMP
 	.select_task_rq		= select_task_rq_grr,
-/*	.rq_online		=, */
-/*	.rq_offline		=, */
-/*	.switched_from		=, */
 #endif
-
 	.set_curr_task          = set_curr_task_grr,
 	.task_tick		= task_tick_grr,
-
 	.prio_changed		= prio_changed_grr,
 	.switched_to		= switched_to_grr,
-
 	.get_rr_interval	= get_rr_interval_grr,
-
 #ifdef CONFIG_GRR_GROUP_SCHED
 	.task_move_group	= task_move_group_grr,
 #endif
@@ -514,6 +479,5 @@ extern void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq);
 
 void print_grr_stats(struct seq_file *m, int cpu)
 {
-	//trace_printk("GRR: task_tick_grr\n");
 }
 #endif /* CONFIG_SCHED_DEBUG */
