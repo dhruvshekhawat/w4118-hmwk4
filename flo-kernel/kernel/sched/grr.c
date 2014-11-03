@@ -151,7 +151,7 @@ void init_grr_rq(struct grr_rq *grr_rq)
 	printk(KERN_ERR "GRR: init");
 	INIT_LIST_HEAD(&grr_rq->queue);
 	printk(KERN_ERR "GRR: init DONE");
-//	grr_rq->grr_nr_running = 0;
+	grr_rq->grr_nr_running = 0;
 //	raw_spin_lock_init(&grr_rq->grr_runtime_lock);
 //	grr_rq->grr_time = 0;
 //	grr_rq->grr_throttled = 0;
@@ -246,6 +246,7 @@ static void enqueue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se, b
 	}
 	else
 		list_add_tail(&grr_se->task_queue, queue);
+	++rq->grr.grr_nr_running;
 	printk(KERN_ERR "HO:AAAAAAA\n");
 }
 
@@ -273,6 +274,7 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 	printk("GRR: dequeue_task_grr\n");
 	update_curr_grr(rq);
 	dequeue_grr_entity(grr_se);
+	--rq->grr.grr_nr_running;
 	dec_nr_running(rq);
 
 }
@@ -280,10 +282,11 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
-	struct grr_rq *grr_rq = &rq->grr;
+	//struct grr_rq *grr_rq = &rq->grr;
+	struct list_head *queue = grr_queue_of_rq(rq);
 
 	//trace_printk("GRR: requeue_task_grr\n");
-	list_move_tail(&grr_se->task_queue, &grr_rq->queue);
+	list_move_tail(&grr_se->task_queue, queue);
 }
 
 static void yield_task_grr(struct rq *rq)
@@ -339,23 +342,24 @@ static void check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int fla
 
 /*
  * As we want a round robin we should put all of our task in a queue.
- * Then the pick_next_task will be just get the head of this list
+ * Then the pick_next_task will just get the head of this list
  */
 static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
 	struct sched_grr_entity *head;
 	struct task_struct *p;
 	struct grr_rq *grr_rq  = &rq->grr;
-
+	printk(KERN_ERR "pick next task\n");
 	//trace_printk("GRR: pick_next_task_grr\n");
 	if (unlikely(!grr_rq->grr_nr_running))
 		return NULL;
 
 	head = list_first_entry(&rq->grr.queue, struct sched_grr_entity,
 				task_queue);
-
+	printk(KERN_ERR "Got the head\n");
 	p = grr_task_of(head);
 	p->se.exec_start = rq->clock;
+	printk(KERN_ERR "return head\n");
 	return p;
 }
 
