@@ -8373,6 +8373,17 @@ struct cgroup_subsys cpuacct_subsys = {
 
 #define FOREGROUND 1
 #define BACKGROUND 2
+#define UNIPROCESSOR (NR_CPUS == 1)
+
+static void assign_cpu_to_group(int cpu, int group)
+{
+	printk(KERN_ERR "assigned cpu %d to group %d\n", cpu, group);
+}
+
+static void assign_cpu_to_both_groups(int cpu)
+{
+	printk(KERN_ERR "assigned cpu %d to both groups\n", cpu);
+}
 
 /* This system call will assign numCPU to the given group,
  * and assign (totalCPU - numCPU) to the other group.
@@ -8380,21 +8391,34 @@ struct cgroup_subsys cpuacct_subsys = {
  */
 SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 {
-	int dest_cpu;
-	struct sched_domain *sd;
+	int i;
+	int cpu;
+	int group_2;
 
 	if (current_euid() != 0 && current_uid() != 0)
 		return -EACCES;
-	if (numCPU < 1 && numCPU >= NR_CPUS)
+	if (numCPU < 1 || (numCPU >= NR_CPUS && NR_CPUS > 1))
 		return -EINVAL;
 	if (group != 1 && group != 2)
 		return -EINVAL;
 
-	rcu_read_lock();
-	for_each_cpu(dest_cpu, sched_domain_span(sd)) {
-		printk(KERN_DEBUG "%d\n", dest_cpu);
+	if (UNIPROCESSOR) {
+		assign_both_groups_to_cpu(cpu);
+		return 0;
 	}
-	rcu_read_unlock();
+
+	if (group == FOREGROUND)
+		group_2 = BACKGROUND;
+	else
+		group_2 = FOREGROUND;
+
+	for_each_online_cpu(cpu) {
+		if (i < numCPU)
+			assign_cpu_to_group(cpu, group);
+		else
+			assign_cpu_to_group(cpu, group_2);
+		i++;
+	}
 
 	return 0;
 }
