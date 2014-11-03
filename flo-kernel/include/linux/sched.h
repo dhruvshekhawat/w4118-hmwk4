@@ -1259,8 +1259,8 @@ struct sched_grr_entity {
 	unsigned int time_slice;
 	int nr_cpus_allowed;
 	struct sched_grr_entity *back;
-//	struct grr_rq *grr_rq;
-//	struct grr_rq *my_q;
+	struct grr_rq *grr_rq;
+	struct grr_rq *my_q;
 };
 #endif
 

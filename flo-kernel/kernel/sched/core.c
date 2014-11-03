@@ -4138,7 +4138,6 @@ static int __sched_setscheduler(struct task_struct *p, int policy,
 	struct rq *rq;
 	int reset_on_fork;
 
-	printk(KERN_ERR "########:sched_setscheduler: from: %d to: %d\n", p->policy, policy);
 	/* may grab non-irq protected spin_locks */
 	BUG_ON(in_interrupt());
 recheck:
@@ -4256,7 +4255,6 @@ recheck:
 	}
 #endif
 
-	printk(KERN_ERR "########:after user\n");
 	/* recheck policy now with rq lock held */
 	if (unlikely(oldpolicy != -1 && oldpolicy != p->policy)) {
 		policy = oldpolicy = -1;
@@ -4281,15 +4279,10 @@ recheck:
 	if (on_rq)
 		enqueue_task(rq, p, 0);
 
-	printk(KERN_ERR "%d %d\n", oldpolicy, p->policy);
-	printk(KERN_ERR "########:enqueue\n");
 	check_class_changed(rq, p, prev_class, oldprio);
-	printk(KERN_ERR "########:after check_class\n");
 	task_rq_unlock(rq, p, &flags);
-	printk(KERN_ERR "########:after task_rq_unlock\n");
 
 	rt_mutex_adjust_pi(p);
-	printk(KERN_ERR "########:going to exit from set_sched\n");
 
 	return 0;
 }
