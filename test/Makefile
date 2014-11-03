@@ -1,21 +1,18 @@
 CC := arm-none-linux-gnueabi-gcc
 LD := arm-none-linux-gnueabi-gcc
-CFLAGS := -g -Wall -Werror -static
+CFLAGS := -g -Wall -Werror
 LDFLAGS := -static
 
-OBJECTS := test.o
+OBJECTS := set_sched_policy.c
+EXE := set_sched_policy
 
-all: test 
+all : $(OBJECTS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(EXE) $(OBJECTS)
 
-
-: $(OBJECTS)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJECTS)
-
-%.o: %.c 
+%.o: %.c
 	$(CC) $(CFLAGS) -c $^
 
 clean:
-	rm -f test 
-	rm -f test.o
+	rm -f $(EXE)
 
 .PHONY: clean
