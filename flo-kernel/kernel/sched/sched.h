@@ -395,7 +395,7 @@ struct rq {
 #endif
 	int skip_clock_update;
 
-#ifdef CONFIG_GRR_GROUP_SCHED
+#ifdef CONFIG_GRR
 	bool foreground; /* flag to store if cpu can handle foreground tasks */
 	bool background; /* flag to store if cpu can handle background tasks */
 #endif

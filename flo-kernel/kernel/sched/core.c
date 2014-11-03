@@ -8381,7 +8381,7 @@ static void assign_cpu_to_group(int cpu, int group)
 
 	raw_spin_lock_init(&rq->lock);
 
-	spin_lock(&rq->lock);
+	raw_spin_lock(&rq->lock);
 	if (group == FOREGROUND) {
 		rq->foreground = true;
 		rq->background = false;
@@ -8389,7 +8389,7 @@ static void assign_cpu_to_group(int cpu, int group)
 		rq->foreground = false;
 		rq->background = true;
 	}
-	spin_unlock(&rq->lock);
+	raw_spin_unlock(&rq->lock);
 
 	printk(KERN_ERR "assigned cpu %d to group %d\n", cpu, group);
 }
@@ -8400,10 +8400,10 @@ static void assign_cpu_to_both_groups(int cpu)
 
 	raw_spin_lock_init(&rq->lock);
 
-	spin_lock(&rq->lock);
+	raw_spin_lock(&rq->lock);
 	rq->foreground = true;
-	rq->background = true
-	spin_unlock(&rq->lock);
+	rq->background = true;
+	raw_spin_unlock(&rq->lock);
 
 	printk(KERN_ERR "assigned cpu %d to both groups\n", cpu);
 }
