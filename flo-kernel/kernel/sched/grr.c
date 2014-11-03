@@ -34,9 +34,9 @@ static int can_move_grr_task(struct task_struct *p,
 
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
-#ifdef CONFIG_SCHED_DEBUG
+/*#ifdef CONFIG_SCHED_DEBUG
 	WARN_ON_ONCE(!grr_entity_is_task(grr_se));
-#endif
+#endif*/
 	return container_of(grr_se, struct task_struct, grr);
 }
 
@@ -157,7 +157,7 @@ void init_grr_rq(struct grr_rq *grr_rq)
 static void destroy_rt_bandwidth(struct rt_bandwidth *rt_b)
 {
 }
-
+/*
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
 //#ifdef CONFIG_SCHED_DEBUG
@@ -170,7 +170,7 @@ static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 //{
 //	return grr_se->grr_rq;
 //}
-
+*/
 /*
  * Given a runqueue return the running queue of grr policy
  */
