@@ -5,7 +5,7 @@
 int main(int argc, char *argv[] ) {
 
 	int i, error;
-/*	if ( argc != 2 ) {
+	if ( argc != 2 ) {
 		printf("USAGE: set_sched_policy <pid>\n");
 		return 0;
 	}
@@ -14,11 +14,11 @@ int main(int argc, char *argv[] ) {
 	if (i < 4) {
 		 printf("set other pid than %d\n",i);
 		 return 0;
-	}*/
+	}
 
 	struct sched_param param;
 	param.sched_priority = 0;
-	error = sched_setscheduler(0, 6, & param);
+	error = sched_setscheduler(i, 6, & param);
 	if (error == -1)
 		perror("sched");
 //	printf("error: %d",error);

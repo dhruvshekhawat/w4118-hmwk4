@@ -349,15 +349,18 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 	struct sched_grr_entity *head;
 	struct task_struct *p;
 	struct grr_rq *grr_rq  = &rq->grr;
-	printk(KERN_ERR "pick next task\n");
-	//trace_printk("GRR: pick_next_task_grr\n");
+
 	if (unlikely(!grr_rq->grr_nr_running))
 		return NULL;
 
 	head = list_first_entry(&rq->grr.queue, struct sched_grr_entity,
 				task_queue);
-	printk(KERN_ERR "Got the head\n");
 	p = grr_task_of(head);
+	if (!p){
+		printk(KERN_ERR "GOT YAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
+		return NULL;
+	}
+	trace_printk("Taks: %s\n", p->comm);
 	p->se.exec_start = rq->clock;
 	printk(KERN_ERR "return head\n");
 	return p;

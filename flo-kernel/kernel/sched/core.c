@@ -1782,15 +1782,15 @@ void sched_fork(struct task_struct *p)
 	 */
 	if (unlikely(p->sched_reset_on_fork)) {
 		if (task_has_rt_policy(p)) {
-/*
- #ifdef CONFIG_GRR
+
+#ifdef CONFIG_GRR
 			p->policy = SCHED_GRR;
 #else
-*/
+
 			p->policy = SCHED_NORMAL;
 			p->static_prio = NICE_TO_PRIO(0);
 			p->rt_priority = 0;
-//#endif
+#endif
 		} else if (PRIO_TO_NICE(p->static_prio) < 0)
 			p->static_prio = NICE_TO_PRIO(0);
 
