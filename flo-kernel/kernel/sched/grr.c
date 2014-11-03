@@ -14,6 +14,8 @@ struct load {
 	int cpu;
 };
 
+#ifdef CONFIG_SMP
+
 static int can_move_grr_task(struct task_struct *p,
 			     struct rq *source,
 			     struct rq *target)
@@ -29,6 +31,7 @@ static int can_move_grr_task(struct task_struct *p,
 		return 0;
 	return 1;
 }
+#endif
 
 #define grr_entity_is_task(rt_se) (!(rt_se)->my_q)
 
@@ -40,6 +43,7 @@ static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 	return container_of(grr_se, struct task_struct, grr);
 }
 
+#ifdef CONFIG_SMP
 static void grr_load_balance(void)
 {
 	int cpus_online;
@@ -140,6 +144,7 @@ unlock:
 	rcu_read_unlock();
 	double_rq_unlock(source_rq, target_rq);
 }
+#endif
 
 void init_grr_rq(struct grr_rq *grr_rq)
 {
@@ -287,6 +292,7 @@ static void yield_task_grr(struct rq *rq)
 	requeue_task_grr(rq,rq->curr,0);
 }
 
+#ifdef CONFIG_SMP
 static int
 select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
@@ -318,6 +324,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	}
 	return smallest_rq;
 }
+#endif
 
 /*
  * Preempt the current task with a newly woken task if needed:
