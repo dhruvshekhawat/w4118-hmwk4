@@ -1739,7 +1739,9 @@ static void __sched_fork(struct task_struct *p)
 #endif
 
 	INIT_LIST_HEAD(&p->rt.run_list);
-
+#ifdef CONFIG_GRR
+	INIT_LIST_HEAD(&p->grr.task_queue);
+#endif
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	INIT_HLIST_HEAD(&p->preempt_notifiers);
 #endif
@@ -4251,6 +4253,7 @@ recheck:
 	}
 #endif
 
+	printk(KERN_ERR "########:after user\n");
 	/* recheck policy now with rq lock held */
 	if (unlikely(oldpolicy != -1 && oldpolicy != p->policy)) {
 		policy = oldpolicy = -1;
@@ -4275,10 +4278,12 @@ recheck:
 	if (on_rq)
 		enqueue_task(rq, p, 0);
 
+	printk(KERN_ERR "########:enqueue\n");
 	check_class_changed(rq, p, prev_class, oldprio);
 	task_rq_unlock(rq, p, &flags);
 
 	rt_mutex_adjust_pi(p);
+	printk(KERN_ERR "########:going to exit from set_sched\n");
 
 	return 0;
 }
@@ -7047,7 +7052,7 @@ void __init sched_init(void)
 		init_cfs_rq(&rq->cfs);
 		init_rt_rq(&rq->rt, rq);
 #ifdef CONFIG_GRR
-		init_grr_rq(&rq->grr, rq);
+		init_grr_rq(&rq->grr);
 #endif
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;

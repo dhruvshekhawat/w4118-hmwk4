@@ -141,22 +141,43 @@ unlock:
 	double_rq_unlock(source_rq, target_rq);
 }
 
-void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
+void init_grr_rq(struct grr_rq *grr_rq)
 {
-	//trace_printk("GRR: init_grr_rq\n");
+	printk(KERN_ERR "GRR: init");
 	INIT_LIST_HEAD(&grr_rq->queue);
-	grr_rq->grr_nr_running = 0;
+	printk(KERN_ERR "GRR: init DONE");
+//	grr_rq->grr_nr_running = 0;
+//	raw_spin_lock_init(&grr_rq->grr_runtime_lock);
+//	grr_rq->grr_time = 0;
+//	grr_rq->grr_throttled = 0;
+//	grr_rq->grr_runtime = 0;
+
 }
 
 static void destroy_rt_bandwidth(struct rt_bandwidth *rt_b)
 {
 }
 
-static inline struct grr_rq *grr_rq_of_se(struct sched_grr_entity *grr_se)
+static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
-	return grr_se->grr_rq;
+//#ifdef CONFIG_SCHED_DEBUG
+//	WARN_ON_ONCE(!grr_entity_is_task(grr_se));
+//#endif
+	return container_of(grr_se, struct task_struct, grr);
 }
 
+//static inline struct grr_rq *grr_rq_of_se(struct sched_grr_entity *grr_se)
+//{
+//	return grr_se->grr_rq;
+//}
+
+/*
+ * Given a runqueue return the running queue of grr policy
+ */
+static inline struct list_head *grr_queue_of_rq(struct rq *rq)
+{
+	return &rq->grr.queue;
+}
 
 /*
  * Update the current task's runtime statistics. Skip current tasks that
@@ -196,13 +217,31 @@ static void dequeue_grr_entity(struct sched_grr_entity *grr_se)
 	list_del_init(&grr_se->task_queue);
 }
 
-static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
+static void enqueue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se, bool head)
 {
 	//trace_printk("GRR: enqueue_grr_entity\n");
-	if (head)
-		list_add(&grr_se->task_queue, &grr_se->task_queue);
+	printk(KERN_ERR "in enqueue entity\n");
+	struct list_head *queue = grr_queue_of_rq(rq);
+
+//	struct task_struct *tsk = grr_task_of(grr_se);
+//	struct list_head *queue = &tsk->grr.task_queue;
+
+	//struct grr_rq *pgrr_rq = grr_rq_of_se(grr_se);
+//	printk(KERN_ERR "grr_rq \n");
+
+//	printk(KERN_ERR "taike head %p\n", grr_se);
+//	printk(KERN_ERR "taike head %p\n", tsk);
+//	printk(KERN_ERR "taike head %p \n", tsk->grr);
+//	printk(KERN_ERR "taike head %p \n", tsk->grr.queue);
+//	printk(KERN_ERR "taike head %p \n", queue);
+//
+	if (head) {
+		printk (KERN_ERR "1\n");
+		list_add(&grr_se->task_queue, queue);
+	}
 	else
-		list_add_tail(&grr_se->task_queue, &grr_se->task_queue);
+		list_add_tail(&grr_se->task_queue, queue);
+	printk(KERN_ERR "HO:AAAAAAA\n");
 }
 
 /*
@@ -211,10 +250,13 @@ static void enqueue_grr_entity(struct sched_grr_entity *grr_se, bool head)
 static void
 enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
-	struct sched_grr_entity *grr_se = &p->grr;
+//	trace_printk("GRR: enqueue_task_grr\n");
+	printk(KERN_ERR "in enqueue task: %p\n", p);
+	printk(KERN_ERR "in enqueue task: %p\n", &(p->grr));
+	struct sched_grr_entity *grr_se = &(p->grr);
 
-	//trace_printk("GRR: enqueue_task_grr\n");
-	enqueue_grr_entity(grr_se, flags & ENQUEUE_HEAD);
+
+	enqueue_grr_entity(rq, grr_se, flags & ENQUEUE_HEAD);
 	inc_nr_running(rq);
 }
 
@@ -223,7 +265,7 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 
-	//trace_printk("GRR: dequeue_task_grr\n");
+	printk("GRR: dequeue_task_grr\n");
 	update_curr_grr(rq);
 	dequeue_grr_entity(grr_se);
 	dec_nr_running(rq);
@@ -399,9 +441,10 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 
 static void set_curr_task_grr(struct rq *rq)
 {
+	printk(KERN_ERR "in set_curr\n");
+	trace_printk("GRR: set_curr_task_grr\n");
 	struct task_struct *p = rq->curr;
 
-	//trace_printk("GRR: set_curr_task_grr\n");
 	p->se.exec_start = rq->clock_task;
 }
 
