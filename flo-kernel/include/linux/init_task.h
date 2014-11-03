@@ -135,22 +135,18 @@ extern struct cred init_cred;
 #define INIT_TASK_COMM "swapper"
 
 #ifdef CONFIG_GRR
-  #ifdef CONGIG_GRR_INIT
     #define SCHED_NORMAL_OR_GRR SCHED_GRR
-    #define INIT_GRR \
+    #define INIT_GRR(tsk) \
 	.grr		= {						\
 		.time_slice	= GRR_TIMESLICE,			\
+		.task_queue     = LIST_HEAD_INIT(tsk.grr.task_queue),   \
 	},
-  #else
-    #define INIT_GRR
-    #define SCHED_NORMAL_OR_GRR SCHED_NORMAL
-  #endif
   #ifndef GRR_TIMESLICE
     #define GRR_TIMESLICE 100 * HZ / 1000
   #endif
 #else
   #define SCHED_NORMAL_OR_GRR SCHED_NORMAL
-  #define INIT_GRR
+  #define INIT_GRR(tsk)
 #endif
 
 /*
@@ -178,7 +174,7 @@ extern struct cred init_cred;
 		.time_slice	= RR_TIMESLICE,				\
 		.nr_cpus_allowed = NR_CPUS,				\
 	},								\
-	INIT_GRR							\
+	INIT_GRR(tsk)							\
 	.tasks		= LIST_HEAD_INIT(tsk.tasks),			\
 	INIT_PUSHABLE_TASKS(tsk)					\
 	.ptraced	= LIST_HEAD_INIT(tsk.ptraced),			\
