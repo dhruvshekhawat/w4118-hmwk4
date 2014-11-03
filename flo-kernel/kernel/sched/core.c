@@ -3895,13 +3895,14 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 	if (running)
 		p->sched_class->put_prev_task(rq, p);
 
-/*
+
  #ifdef CONFIG_GRR
+	printk(KERN_ERR "rt_mutex_setprio\n");
 	if (is_grr_prio(p))
 		p->sched_class = &grr_sched_class;
 	else
 #endif
-*/
+
 	if (rt_prio(prio))
 		p->sched_class = &rt_sched_class;
 	else

@@ -225,7 +225,7 @@ static void dequeue_grr_entity(struct sched_grr_entity *grr_se)
 static void enqueue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se, bool head)
 {
 	//trace_printk("GRR: enqueue_grr_entity\n");
-	printk(KERN_ERR "in enqueue entity\n");
+	//printk(KERN_ERR "in enqueue entity\n");
 	struct list_head *queue = grr_queue_of_rq(rq);
 
 //	struct task_struct *tsk = grr_task_of(grr_se);
@@ -247,7 +247,7 @@ static void enqueue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se, b
 	else
 		list_add_tail(&grr_se->task_queue, queue);
 	++rq->grr.grr_nr_running;
-	printk(KERN_ERR "HO:AAAAAAA\n");
+	//printk(KERN_ERR "HO:AAAAAAA\n");
 }
 
 /*
@@ -257,11 +257,13 @@ static void
 enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 //	trace_printk("GRR: enqueue_task_grr\n");
-	printk(KERN_ERR "in enqueue task: %p\n", p);
-	printk(KERN_ERR "in enqueue task: %p\n", &(p->grr));
+//	printk(KERN_ERR "in enqueue task: %p\n", p);
+//	printk(KERN_ERR "in enqueue task: %p\n", &(p->grr));
 	struct sched_grr_entity *grr_se = &(p->grr);
 
-
+	if (flags & ENQUEUE_WAKEUP)
+		grr_se->timeout = 0;
+	
 	enqueue_grr_entity(rq, grr_se, flags & ENQUEUE_HEAD);
 	inc_nr_running(rq);
 }
@@ -271,7 +273,7 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 
-	printk("GRR: dequeue_task_grr\n");
+//	printk("GRR: dequeue_task_grr\n");
 	update_curr_grr(rq);
 	dequeue_grr_entity(grr_se);
 	--rq->grr.grr_nr_running;
@@ -349,7 +351,7 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 	struct sched_grr_entity *head;
 	struct task_struct *p;
 	struct grr_rq *grr_rq  = &rq->grr;
-
+	
 	if (unlikely(!grr_rq->grr_nr_running))
 		return NULL;
 
@@ -360,9 +362,9 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 		printk(KERN_ERR "GOT YAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
 		return NULL;
 	}
-	trace_printk("Taks: %s\n", p->comm);
+	printk(KERN_ERR "Taks: %s\n", p->comm);
 	p->se.exec_start = rq->clock;
-	printk(KERN_ERR "return head\n");
+//	printk(KERN_ERR "return head\n");
 	return p;
 }
 
@@ -390,10 +392,10 @@ static void switched_to_grr(struct rq *rq, struct task_struct *p)
 	 * If the running proccess in not real time then
 	 * this process must execute
 	 */
-	printk(KERN_ERR "in switch_to\n");
+//	printk(KERN_ERR "in switch_to\n");
 	if (!rt_task(rq->curr))
 		resched_task(rq->curr);
-	printk(KERN_ERR "exit switch_to");
+//	printk(KERN_ERR "exit switch_to");
 
 }
 
@@ -414,7 +416,7 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 {
 	unsigned long soft, hard;
 
-	//trace_printk("GRR: watchdog\n");
+	printk("GRR: watchdog\n");
 	/* max may change after cur was read, this will be fixed next tick */
 	soft = task_rlimit(p, RLIMIT_RTTIME);
 	hard = task_rlimit_max(p, RLIMIT_RTTIME);
@@ -424,8 +426,10 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 
 		p->grr.timeout++;
 		next = DIV_ROUND_UP(min(soft, hard), USEC_PER_SEC/HZ);
-		if (p->grr.timeout > next)
+		if (p->grr.timeout > next) {
+			printk(KERN_ERR "watchdog: %s\n", p->comm);
 			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
+		}
 	}
 }
 
@@ -457,8 +461,8 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 
 static void set_curr_task_grr(struct rq *rq)
 {
-	printk(KERN_ERR "in set_curr\n");
-	trace_printk("GRR: set_curr_task_grr\n");
+	//printk(KERN_ERR "in set_curr\n");
+	//trace_printk("GRR: set_curr_task_grr\n");
 	struct task_struct *p = rq->curr;
 
 	p->se.exec_start = rq->clock_task;
