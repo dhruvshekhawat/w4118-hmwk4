@@ -376,8 +376,10 @@ static void switched_to_grr(struct rq *rq, struct task_struct *p)
 	 * If the running proccess in not real time then
 	 * this process must execute
 	 */
+	printk(KERN_ERR "in switch_to\n");
 	if (!rt_task(rq->curr))
 		resched_task(rq->curr);
+	printk(KERN_ERR "exit switch_to");
 
 }
 

@@ -4096,8 +4096,10 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	/* we are holding p->pi_lock already */
 	p->prio = rt_mutex_getprio(p);
 #ifdef CONFIG_GRR
-	if (is_grr_prio(p))
+	if (is_grr_prio(p)) {
 		p->sched_class = &grr_sched_class;
+		printk(KERN_ERR "change class\n");
+	}
 	else
 #endif
 	if (rt_prio(p->prio))
@@ -4278,9 +4280,12 @@ recheck:
 	if (on_rq)
 		enqueue_task(rq, p, 0);
 
+	printk(KERN_ERR "%d %d\n", oldpolicy, p->policy);
 	printk(KERN_ERR "########:enqueue\n");
 	check_class_changed(rq, p, prev_class, oldprio);
+	printk(KERN_ERR "########:after check_class\n");
 	task_rq_unlock(rq, p, &flags);
+	printk(KERN_ERR "########:after task_rq_unlock\n");
 
 	rt_mutex_adjust_pi(p);
 	printk(KERN_ERR "########:going to exit from set_sched\n");
