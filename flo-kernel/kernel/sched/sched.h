@@ -395,6 +395,11 @@ struct rq {
 #endif
 	int skip_clock_update;
 
+#ifdef CONFIG_GRR_GROUP_SCHED
+	bool foreground; /* flag to store if cpu can handle foreground tasks */
+	bool background; /* flag to store if cpu can handle background tasks */
+#endif
+
 	/* capture load from *all* tasks on this cpu: */
 	struct load_weight load;
 	unsigned long nr_load_updates;

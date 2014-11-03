@@ -30,6 +30,16 @@ static int can_move_grr_task(struct task_struct *p,
 	return 1;
 }
 
+#define grr_entity_is_task(rt_se) (!(rt_se)->my_q)
+
+static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
+{
+#ifdef CONFIG_SCHED_DEBUG
+	WARN_ON_ONCE(!grr_entity_is_task(grr_se));
+#endif
+	return container_of(grr_se, struct task_struct, grr);
+}
+
 static void grr_load_balance(void)
 {
 	int cpus_online;
@@ -41,8 +51,8 @@ static void grr_load_balance(void)
 	struct task_struct *p;
 	struct sched_grr_entity *grr_se;
 
-	maxload.value = 0;
-	minload.value = 0;
+	maxload.nr_running = 0;
+	minload.nr_running = 0;
 
 	printk(KERN_ERR "loadbalancing: START\n");
 
@@ -115,12 +125,12 @@ static void grr_load_balance(void)
 			goto unlock;
 		}
 
-		printk(KERN_ERR "no task moved; maxload=%d, minload=%d\n",
+		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
 						maxload.nr_running,
 						minload.nr_running);
 		goto unlock;
 	}
-	printk(KERN_ERR "no need to loadbalance; maxload=%d, minload=%d\n",
+	printk(KERN_ERR "no need to loadbalance; maxload=%ld, minload=%ld\n",
 					maxload.nr_running,
 					minload.nr_running);
 	return;
@@ -140,16 +150,6 @@ void init_grr_rq(struct grr_rq *grr_rq, struct rq *rq)
 
 static void destroy_rt_bandwidth(struct rt_bandwidth *rt_b)
 {
-}
-
-#define grr_entity_is_task(rt_se) (!(rt_se)->my_q)
-
-static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
-{
-#ifdef CONFIG_SCHED_DEBUG
-	WARN_ON_ONCE(!grr_entity_is_task(grr_se));
-#endif
-	return container_of(grr_se, struct task_struct, grr);
 }
 
 static inline struct grr_rq *grr_rq_of_se(struct sched_grr_entity *grr_se)

@@ -8377,11 +8377,34 @@ struct cgroup_subsys cpuacct_subsys = {
 
 static void assign_cpu_to_group(int cpu, int group)
 {
+	struct rq *rq = cpu_rq(cpu);
+
+	raw_spin_lock_init(&rq->lock);
+
+	spin_lock(&rq->lock);
+	if (group == FOREGROUND) {
+		rq->foreground = true;
+		rq->background = false;
+	} else if (group == BACKGROUND) {
+		rq->foreground = false;
+		rq->background = true;
+	}
+	spin_unlock(&rq->lock);
+
 	printk(KERN_ERR "assigned cpu %d to group %d\n", cpu, group);
 }
 
 static void assign_cpu_to_both_groups(int cpu)
 {
+	struct rq *rq = cpu_rq(cpu);
+
+	raw_spin_lock_init(&rq->lock);
+
+	spin_lock(&rq->lock);
+	rq->foreground = true;
+	rq->background = true
+	spin_unlock(&rq->lock);
+
 	printk(KERN_ERR "assigned cpu %d to both groups\n", cpu);
 }
 
@@ -8391,8 +8414,8 @@ static void assign_cpu_to_both_groups(int cpu)
  */
 SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 {
-	int i;
 	int cpu;
+	int i = 0;
 	int group_2;
 
 	if (current_euid() != 0 && current_uid() != 0)
@@ -8403,7 +8426,7 @@ SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 		return -EINVAL;
 
 	if (UNIPROCESSOR) {
-		assign_both_groups_to_cpu(cpu);
+		assign_cpu_to_both_groups(cpu);
 		return 0;
 	}
 
