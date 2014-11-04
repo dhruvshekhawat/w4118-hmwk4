@@ -76,97 +76,103 @@ void grr_load_balance(void)
 		cpus_online++;
 	}
 
-	/* given the min and max load
-	 * decide if you should load balance
-	 */
-	if (maxload.nr_running > minload.nr_running+1) {
-		/* worth load balancing */
-		/* check __migrate_task() from core.c */
-		source_rq = maxload.rq;
-		target_rq = minload.rq;
-	 	printk(KERN_ERR "1-MOTHERFUCKER -- IN IF %p %p\n", source_rq, target_rq);
-
-		/* lock RQs */
-		double_rq_lock(source_rq, target_rq);
-		rcu_read_lock();
-
-		/* find next movable task from source_rq */
-		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
-			/* get next eligible task from source_rq */
-			p = grr_task_of(grr_se);
-
-			if (p == NULL)
-				goto unlock;
-
-			if (!can_move_grr_task(p, source_rq, target_rq)) {
-				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
-								p->comm,
-								source_rq->cpu,
-								target_rq->cpu);
-				continue;
-			}
-
-			/* move task p from source_rq to target_rq
-			 * see sched_move_task() in core.c for details
-			 */
-			deactivate_task(source_rq, p, 0);
-			set_task_cpu(p, target_rq->cpu);
-			activate_task(target_rq, p, 0);
-
-			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
-							p->comm,
-							source_rq->cpu,
-							target_rq->cpu);
-
-			goto unlock;
-		}
-
-		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
-						maxload.nr_running,
-						minload.nr_running);
-		goto unlock;
-	}
-	printk(KERN_ERR "no need to loadbalance; maxload=%ld, minload=%ld\n",
-					maxload.nr_running,
-					minload.nr_running);
-	return;
-
-unlock:
-	printk(KERN_ERR "loadbalancing: END\n\n");
-	rcu_read_unlock();
-	double_rq_unlock(source_rq, target_rq);
+//	/* given the min and max load
+//	 * decide if you should load balance
+//	 */
+//	if (maxload.nr_running > minload.nr_running+1) {
+//		/* worth load balancing */
+//		/* check __migrate_task() from core.c */
+//		source_rq = maxload.rq;
+//		target_rq = minload.rq;
+//	 	printk(KERN_ERR "1-MOTHERFUCKER -- IN IF %p %p\n", source_rq, target_rq);
+//
+//		/* lock RQs */
+//		double_rq_lock(source_rq, target_rq);
+//		rcu_read_lock();
+//
+//		/* find next movable task from source_rq */
+//		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
+//			/* get next eligible task from source_rq */
+//			p = grr_task_of(grr_se);
+//
+//			if (p == NULL)
+//				goto unlock;
+//
+//			if (!can_move_grr_task(p, source_rq, target_rq)) {
+//				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
+//								p->comm,
+//								source_rq->cpu,
+//								target_rq->cpu);
+//				continue;
+//			}
+//
+//			/* move task p from source_rq to target_rq
+//			 * see sched_move_task() in core.c for details
+//			 */
+//			deactivate_task(source_rq, p, 0);
+//			set_task_cpu(p, target_rq->cpu);
+//			activate_task(target_rq, p, 0);
+//
+//			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
+//							p->comm,
+//							source_rq->cpu,
+//							target_rq->cpu);
+//
+//			goto unlock;
+//		}
+//
+//		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
+//						maxload.nr_running,
+//						minload.nr_running);
+//		goto unlock;
+//	}
+//	printk(KERN_ERR "no need to loadbalance; maxload=%ld, minload=%ld\n",
+//					maxload.nr_running,
+//					minload.nr_running);
+//	return;
+//
+//unlock:
+//	printk(KERN_ERR "loadbalancing: END\n\n");
+//	rcu_read_unlock();
+//	double_rq_unlock(source_rq, target_rq);
 }
 
 static int
 select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
 	int i;
-	int orig_cpu = task_cpu(p);
 	struct rq *rq;
-	int smallest_rq = orig_cpu;
-	unsigned long orig_weight = cpu_rq(orig_cpu)->grr.grr_nr_total;
-	unsigned long smallest_rq_weight = orig_weight;
+	int min_rq;
+	int orig_cpu;
+	unsigned long orig_nr;
+	unsigned long min_nr;
 
-	//trace_printk("GRR: select_task_rq_grr\n");
 	if (p->grr.nr_cpus_allowed == 1)
 		return orig_cpu;
 
+	orig_cpu = task_cpu(p);
+	orig_nr = cpu_rq(orig_cpu)->grr.grr_nr_running;
+	min_nr = orig_nr;
+
 	rq = cpu_rq(orig_cpu);
+	min_rq = orig_cpu;
 
-	/*
-	 * Here load balancing should take place
-	 */
-
+	rcu_read_lock();
 	for_each_online_cpu(i) {
 		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
 		if (!cpumask_test_cpu(i, &p->cpus_allowed))
 			continue;
-		if (grr_rq->grr_nr_total < smallest_rq_weight) {
-			smallest_rq_weight = grr_rq->grr_nr_total;
-			smallest_rq = i;
+		if (grr_rq->grr_nr_running < min_nr) {
+			min_nr = grr_rq->grr_nr_running;
+			min_rq = i;
 		}
+		if (grr_rq->grr_nr_running != 0)
+			trace_printk("%d %d\n", i, grr_rq->grr_nr_running);
 	}
-	return smallest_rq;
+	rcu_read_unlock();
+	//trace_printk("%d %d\n", orig_cpu, min_rq);
+	trace_printk("--\n", orig_cpu, min_rq);
+	return min_rq;
 }
 #endif /* CONFIG_SMP */
 
@@ -319,7 +325,7 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 	p = grr_task_of(head);
 	if (!p)
 		return NULL;
-	trace_printk("%s %d\n", p->comm, p->grr.time_slice);
+//	trace_printk("%s %d\n", p->comm, p->grr.time_slice);
 	p->se.exec_start = rq->clock;
 	return p;
 }
