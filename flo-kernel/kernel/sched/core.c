@@ -461,6 +461,7 @@ static __init void init_hrtick(void)
 {
 	hotcpu_notifier(hotplug_hrtick, 0);
 }
+
 #else
 /*
  * Called to set the hrtick timer state.
@@ -6919,6 +6920,27 @@ static int cpuset_cpu_inactive(struct notifier_block *nfb, unsigned long action,
 	}
 }
 
+#ifdef CONFIG_GRR
+#define GRR_TIME_INTERVAL 500 * 1000 * 1000
+static struct hrtimer grr_load_balance_timer;
+
+static enum hrtimer_restart __grr_load_balance(struct hrtimer *timer)
+{
+	grr_load_balance();
+	hrtimer_forward_now(&grr_load_balance_timer, ns_to_ktime(GRR_TIME_INTERVAL));
+	return HRTIMER_RESTART;
+}
+
+static void init_grr_balancer(void)
+{
+	hrtimer_init(&grr_load_balance_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	grr_load_balance_timer.function = __grr_load_balance;
+	hrtimer_start(&grr_load_balance_timer,
+				  ns_to_ktime(GRR_TIME_INTERVAL),
+				  HRTIMER_MODE_REL);
+}
+#endif
+
 void __init sched_init_smp(void)
 {
 	cpumask_var_t non_isolated_cpus;
@@ -6950,6 +6972,9 @@ void __init sched_init_smp(void)
 	free_cpumask_var(non_isolated_cpus);
 
 	init_sched_rt_class();
+#ifdef CONFIG_GRR
+	init_grr_balancer();
+#endif
 }
 #else
 void __init sched_init_smp(void)
@@ -7141,12 +7166,12 @@ void __init sched_init(void)
 	calc_load_update = jiffies + LOAD_FREQ;
 
 #ifdef CONFIG_GRR
-#ifdef CONFIG_GRR_AT_BOOT_UP
+//#ifdef CONFIG_GRR_AT_BOOT_UP
 	/*
 	 * During early bootup we pretend to be a grr task:
 	 */
 	current->sched_class = &grr_sched_class;
-#endif
+//#endif
 #else
 	/*
 	 * During early bootup we pretend to be a normal task:

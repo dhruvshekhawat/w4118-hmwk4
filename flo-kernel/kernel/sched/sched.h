@@ -908,6 +908,10 @@ extern const struct sched_class idle_sched_class;
 extern void trigger_load_balance(struct rq *rq, int cpu);
 extern void idle_balance(int this_cpu, struct rq *this_rq);
 
+#ifdef CONFIG_GRR
+extern void grr_load_balance(void);
+#endif
+
 #else	/* CONFIG_SMP */
 
 static inline void idle_balance(int cpu, struct rq *rq)

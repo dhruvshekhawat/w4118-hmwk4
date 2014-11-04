@@ -34,7 +34,7 @@ static int can_move_grr_task(struct task_struct *p,
 	return 1;
 }
 
-static void grr_load_balance(void)
+void grr_load_balance(void)
 {
 	int cpus_online;
 	unsigned long i;
@@ -48,7 +48,7 @@ static void grr_load_balance(void)
 	maxload.nr_running = 0;
 	minload.nr_running = 0;
 
-	//printk(KERN_ERR "loadbalancing: START\n");
+	printk(KERN_ERR "loadbalancing: START\n");
 
 	/*
 	 * iterate through each CPU and
@@ -61,13 +61,14 @@ static void grr_load_balance(void)
 		struct grr_rq *grr_rq = &rq->grr;
 		/* get nr of running jobs under the GRR policy */
 		unsigned long nr_running = grr_rq->grr_nr_running;
+		printk(KERN_ERR "MOTHERFUCKER %d %ld\n", i, nr_running);
 
 		if (maxload.nr_running < nr_running) {
 			maxload.nr_running = nr_running;
 			maxload.rq = rq;
 			maxload.cpu = i;
 		}
-		if (minload.nr_running > nr_running) {
+		if (minload.nr_running >= nr_running) {
 			minload.nr_running = nr_running;
 			minload.rq = rq;
 			minload.cpu = i;
@@ -83,6 +84,7 @@ static void grr_load_balance(void)
 		/* check __migrate_task() from core.c */
 		source_rq = maxload.rq;
 		target_rq = minload.rq;
+	 	printk(KERN_ERR "1-MOTHERFUCKER -- IN IF %p %p\n", source_rq, target_rq);
 
 		/* lock RQs */
 		double_rq_lock(source_rq, target_rq);
@@ -130,7 +132,7 @@ static void grr_load_balance(void)
 	return;
 
 unlock:
-	printk(KERN_ERR "loadbalancing: END\n");
+	printk(KERN_ERR "loadbalancing: END\n\n");
 	rcu_read_unlock();
 	double_rq_unlock(source_rq, target_rq);
 }
@@ -252,7 +254,7 @@ enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 //	printk(KERN_ERR "in enqueue task: %p\n", &(p->grr));
 	if (flags & ENQUEUE_WAKEUP)
 		grr_se->timeout = 0;
-	
+
 	enqueue_grr_entity(rq, grr_se, flags & ENQUEUE_HEAD);
 	inc_nr_running(rq);
 }
