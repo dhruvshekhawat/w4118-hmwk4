@@ -319,23 +319,9 @@ struct rt_rq {
 /* GRR classes' related field in a runqueue: */
 struct grr_rq {
 	unsigned long grr_nr_running;
-#ifdef CONFIG_SMP
-	unsigned long grr_nr_migratory;
-	int overloaded;
-	struct plist_head pushable_tasks;
-#endif
-	int grr_throttled;
-	u64 grr_time;
-	u64 grr_runtime;
-	/* Nests inside the rq lock: */
-	raw_spinlock_t grr_runtime_lock;
-
 #ifdef CONFIG_RT_GROUP_SCHED
-	unsigned long grr_nr_boosted;
-
 	struct rq *rq;
 	struct list_head queue;
-	struct task_group *tg;
 #endif
 };
 #endif

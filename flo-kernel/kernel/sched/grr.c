@@ -141,14 +141,8 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 
 void init_grr_rq(struct grr_rq *grr_rq)
 {
-	printk(KERN_ERR "GRR: init");
 	INIT_LIST_HEAD(&grr_rq->queue);
-	printk(KERN_ERR "GRR: init DONE");
 	grr_rq->grr_nr_running = 0;
-	raw_spin_lock_init(&grr_rq->grr_runtime_lock);
-	grr_rq->grr_time = 0;
-	grr_rq->grr_throttled = 0;
-	grr_rq->grr_runtime = 0;
 
 }
 
