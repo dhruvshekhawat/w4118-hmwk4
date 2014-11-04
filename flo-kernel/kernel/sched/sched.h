@@ -321,7 +321,6 @@ struct grr_rq {
 	unsigned long grr_nr_running;
 #ifdef CONFIG_SMP
 	unsigned long grr_nr_migratory;
-	unsigned long grr_nr_total;
 	int overloaded;
 	struct plist_head pushable_tasks;
 #endif
