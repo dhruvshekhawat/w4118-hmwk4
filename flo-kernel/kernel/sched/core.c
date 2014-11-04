@@ -1776,7 +1776,6 @@ void sched_fork(struct task_struct *p)
 	 * Make sure we do not leak PI boosting priority to the child.
 	 */
 	p->prio = current->normal_prio;
-
 	/*
 	 * Revert to default priority/policy on fork if requested.
 	 */
@@ -1845,6 +1844,7 @@ void sched_fork(struct task_struct *p)
 #endif
 
 	put_cpu();
+
 }
 
 /*
@@ -3898,7 +3898,7 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 
  #ifdef CONFIG_GRR
 	printk(KERN_ERR "rt_mutex_setprio\n");
-	if (is_grr_prio(p))
+	if (is_grr_prio(p) && p->sched_class != &grr_sched_class)
 		p->sched_class = &grr_sched_class;
 	else
 #endif
