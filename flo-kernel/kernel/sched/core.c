@@ -8475,3 +8475,20 @@ SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 
 	return 0;
 }
+
+/*
+ * Helper function for getting the group of a task
+ * p: task pointer from which we want the group
+ */
+static int get_cgroup(struct task_struct *p)
+{
+	char *group_path = task_group_path(task_group(p));
+	int lenght = strlen(group_path);
+	/*
+	 * length > 6 because the foreground group
+	 * is either / or /apps
+	 */
+	if (length > 6)
+		return BACKGROUND;
+	return FOREGROUND;
+}
