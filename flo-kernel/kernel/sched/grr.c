@@ -55,13 +55,9 @@ void grr_load_balance(void)
 	 * find the min and max load accros all CPUs
 	 */
 	for_each_online_cpu(i) {
-		/* get rq of current CPU */
 		struct rq *rq = cpu_rq(i);
-		/* get grr_rq of current CPU */
 		struct grr_rq *grr_rq = &rq->grr;
-		/* get nr of running jobs under the GRR policy */
 		unsigned long nr_running = grr_rq->grr_nr_running;
-		printk(KERN_ERR "MOTHERFUCKER %d %ld\n", i, nr_running);
 
 		if (maxload.nr_running < nr_running) {
 			maxload.nr_running = nr_running;
@@ -75,37 +71,35 @@ void grr_load_balance(void)
 		}
 		cpus_online++;
 	}
+	/* given the min and max load
+	 * decide if you should load balance
+	 */
+	if (maxload.nr_running > minload.nr_running+1) {
+		/* worth load balancing */
+		/* check __migrate_task() from core.c */
+		source_rq = maxload.rq;
+		target_rq = minload.rq;
+	 	printk(KERN_ERR "1-MOTHERFUCKER -- IN IF %p %p\n", source_rq, target_rq);
 
-//	/* given the min and max load
-//	 * decide if you should load balance
-//	 */
-//	if (maxload.nr_running > minload.nr_running+1) {
-//		/* worth load balancing */
-//		/* check __migrate_task() from core.c */
-//		source_rq = maxload.rq;
-//		target_rq = minload.rq;
-//	 	printk(KERN_ERR "1-MOTHERFUCKER -- IN IF %p %p\n", source_rq, target_rq);
-//
-//		/* lock RQs */
-//		double_rq_lock(source_rq, target_rq);
-//		rcu_read_lock();
-//
-//		/* find next movable task from source_rq */
-//		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
-//			/* get next eligible task from source_rq */
-//			p = grr_task_of(grr_se);
-//
-//			if (p == NULL)
-//				goto unlock;
-//
-//			if (!can_move_grr_task(p, source_rq, target_rq)) {
-//				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
-//								p->comm,
-//								source_rq->cpu,
-//								target_rq->cpu);
-//				continue;
-//			}
-//
+		/* lock RQs */
+		double_rq_lock(source_rq, target_rq);
+		rcu_read_lock();
+
+		/* find next movable task from source_rq */
+		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
+			/* get next eligible task from source_rq */
+			p = grr_task_of(grr_se);
+
+			if (p == NULL)
+				goto unlock;
+
+			if (!can_move_grr_task(p, source_rq, target_rq)) {
+				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
+								p->comm,
+								source_rq->cpu,
+								target_rq->cpu);
+				continue;
+			}
 //			/* move task p from source_rq to target_rq
 //			 * see sched_move_task() in core.c for details
 //			 */
@@ -113,28 +107,26 @@ void grr_load_balance(void)
 //			set_task_cpu(p, target_rq->cpu);
 //			activate_task(target_rq, p, 0);
 //
-//			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
-//							p->comm,
-//							source_rq->cpu,
-//							target_rq->cpu);
-//
-//			goto unlock;
-//		}
-//
-//		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
-//						maxload.nr_running,
-//						minload.nr_running);
-//		goto unlock;
-//	}
-//	printk(KERN_ERR "no need to loadbalance; maxload=%ld, minload=%ld\n",
-//					maxload.nr_running,
-//					minload.nr_running);
-//	return;
-//
-//unlock:
-//	printk(KERN_ERR "loadbalancing: END\n\n");
-//	rcu_read_unlock();
-//	double_rq_unlock(source_rq, target_rq);
+			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
+							p->comm,
+							source_rq->cpu,
+							target_rq->cpu);
+			goto unlock;
+		}
+
+		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
+						maxload.nr_running,
+						minload.nr_running);
+		goto unlock;
+	}
+	printk(KERN_ERR "no need to loadbalance; maxload=%ld, minload=%ld\n",
+					maxload.nr_running,
+					minload.nr_running);
+	return;
+unlock:
+	printk(KERN_ERR "loadbalancing: END\n\n");
+	rcu_read_unlock();
+	double_rq_unlock(source_rq, target_rq);
 }
 
 static int
@@ -142,7 +134,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
 	int i;
 	struct rq *rq;
-	int min_rq;
+	int min_cpu;
 	int orig_cpu;
 	unsigned long orig_nr;
 	unsigned long min_nr;
@@ -155,7 +147,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	min_nr = orig_nr;
 
 	rq = cpu_rq(orig_cpu);
-	min_rq = orig_cpu;
+	min_cpu = orig_cpu;
 
 	rcu_read_lock();
 	for_each_online_cpu(i) {
@@ -164,15 +156,12 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 			continue;
 		if (grr_rq->grr_nr_running < min_nr) {
 			min_nr = grr_rq->grr_nr_running;
-			min_rq = i;
+			min_cpu = i;
 		}
-		if (grr_rq->grr_nr_running != 0)
-			trace_printk("%d %d\n", i, grr_rq->grr_nr_running);
 	}
 	rcu_read_unlock();
-	//trace_printk("%d %d\n", orig_cpu, min_rq);
-	trace_printk("--\n", orig_cpu, min_rq);
-	return min_rq;
+
+	return min_cpu;
 }
 #endif /* CONFIG_SMP */
 
@@ -222,7 +211,6 @@ static void update_curr_grr(struct rq *rq)
 
 	 curr->se.exec_start = rq->clock_task;
 	 cpuacct_charge(curr, delta_exec);
-
 }
 
 static void dequeue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se)
@@ -257,7 +245,6 @@ enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &(p->grr);
 
-//	printk(KERN_ERR "in enqueue task: %p\n", &(p->grr));
 	if (flags & ENQUEUE_WAKEUP)
 		grr_se->timeout = 0;
 
@@ -270,7 +257,6 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct sched_grr_entity *grr_se = &p->grr;
 
-//	printk("GRR: dequeue_task_grr\n");
 	update_curr_grr(rq);
 
 	dequeue_grr_entity(rq, grr_se);
@@ -282,7 +268,6 @@ static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 	struct sched_grr_entity *grr_se = &p->grr;
 	struct list_head *queue = grr_queue_of_rq(rq);
 
-	//trace_printk("GRR: requeue_task_grr\n");
 	if (head)
 		list_move(&grr_se->task_queue, queue);
 	else
@@ -291,7 +276,6 @@ static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 
 static void yield_task_grr(struct rq *rq)
 {
-	//trace_printk("GRR: yield_task_grr\n");
 	requeue_task_grr(rq,rq->curr, 0);
 }
 
@@ -301,7 +285,6 @@ static void yield_task_grr(struct rq *rq)
 static void
 check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int flags)
 {
-	//trace_printk("GRR: check_preempt_curr_grr\n");
 	(void)rq;
 	(void)p;
 	(void)flags;
@@ -332,14 +315,12 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 
 static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 {
-	//trace_printk("GRR: put_prev_task_grr\n");
 	/*
 	 * As we are round robin we should put the start
 	 * to 0 and update the current task
 	 */
 	update_curr_grr(rq);
 	p->se.exec_start = 0;
-
 }
 
 /*
@@ -401,7 +382,7 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 		return;
 
 	p->grr.time_slice = GRR_TIMESLICE;
-	trace_printk("%d\n", GRR_TIMESLICE);
+
 	/* Requeue if we're not the only task in the queuede */
 	if (queue->prev != queue->next) {
 		requeue_task_grr(rq, p, 0);
@@ -413,13 +394,12 @@ static void set_curr_task_grr(struct rq *rq)
 {
 	struct task_struct *p = rq->curr;
 
-	//printk(KERN_ERR "in set_curr\n");
 	p->se.exec_start = rq->clock_task;
 }
 
-static unsigned int get_rr_interval_grr(struct rq *rq, struct task_struct *task)
+static inline unsigned int
+get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 {
-	//trace_printk("GRR: get_rr_interval_grr");
 	return GRR_TIMESLICE;
 }
 
