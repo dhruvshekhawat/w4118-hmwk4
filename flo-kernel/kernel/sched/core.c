@@ -8435,7 +8435,7 @@ static void assign_cpu_to_both_groups(int cpu)
 	rq->background = true;
 	raw_spin_unlock(&rq->lock);
 
-	//printk(KERN_ERR "assigned cpu %d to both groups\n", cpu, group);
+	printk(KERN_ERR "assigned cpu %d to both groups\n", cpu);
 }
 
 /* This system call will assign numCPU to the given group,
