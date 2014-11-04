@@ -8407,9 +8407,10 @@ struct cgroup_subsys cpuacct_subsys = {
 static void assign_cpu_to_group(int cpu, int group)
 {
 	struct rq *rq = cpu_rq(cpu);
-
+/*
+ * This is done in line 7072 of this file
 	raw_spin_lock_init(&rq->lock);
-
+*/
 	raw_spin_lock(&rq->lock);
 	if (group == FOREGROUND) {
 		rq->foreground = true;
@@ -8426,15 +8427,15 @@ static void assign_cpu_to_group(int cpu, int group)
 static void assign_cpu_to_both_groups(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
-
+/* This is done in line 7072 of this file
 	raw_spin_lock_init(&rq->lock);
-
+*/
 	raw_spin_lock(&rq->lock);
 	rq->foreground = true;
 	rq->background = true;
 	raw_spin_unlock(&rq->lock);
 
-	printk(KERN_ERR "assigned cpu %d to both groups\n", cpu);
+	printk(KERN_ERR "assigned cpu %d to both groups\n", cpu, group);
 }
 
 /* This system call will assign numCPU to the given group,
