@@ -45,10 +45,12 @@ void grr_load_balance(void)
 	struct task_struct *p;
 	struct sched_grr_entity *grr_se;
 
-	maxload.nr_running = 0;
-	minload.nr_running = 0;
 
 	printk(KERN_ERR "loadbalancing: START\n");
+
+	/* make sure everything is initialized */
+	maxload.nr_running = -1;
+	minload.nr_running = 1000000;
 
 	/*
 	 * iterate through each CPU and
@@ -59,12 +61,12 @@ void grr_load_balance(void)
 		struct grr_rq *grr_rq = &rq->grr;
 		unsigned long nr_running = grr_rq->grr_nr_running;
 
-		if (maxload.nr_running < nr_running) {
+		if (nr_running > maxload.nr_running) {
 			maxload.nr_running = nr_running;
 			maxload.rq = rq;
 			maxload.cpu = i;
 		}
-		if (minload.nr_running >= nr_running) {
+		if (nr_running < minload.nr_running) {
 			minload.nr_running = nr_running;
 			minload.rq = rq;
 			minload.cpu = i;
@@ -75,13 +77,9 @@ void grr_load_balance(void)
 	 * decide if you should load balance
 	 */
 	if (maxload.nr_running > minload.nr_running+1) {
-		/* worth load balancing */
-		/* check __migrate_task() from core.c */
 		source_rq = maxload.rq;
 		target_rq = minload.rq;
-	 	printk(KERN_ERR "1-MOTHERFUCKER -- IN IF %p %p\n", source_rq, target_rq);
 
-		/* lock RQs */
 		double_rq_lock(source_rq, target_rq);
 		rcu_read_lock();
 
@@ -94,19 +92,20 @@ void grr_load_balance(void)
 				goto unlock;
 
 			if (!can_move_grr_task(p, source_rq, target_rq)) {
-				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
-								p->comm,
-								source_rq->cpu,
-								target_rq->cpu);
+//				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
+//								p->comm,
+//								source_rq->cpu,
+//								target_rq->cpu);
 				continue;
 			}
-//			/* move task p from source_rq to target_rq
-//			 * see sched_move_task() in core.c for details
-//			 */
-//			deactivate_task(source_rq, p, 0);
-//			set_task_cpu(p, target_rq->cpu);
-//			activate_task(target_rq, p, 0);
-//
+
+			/*
+			 * move task p from source_rq to target_rq
+			 * see sched_move_task() in core.c for details
+			 */
+			deactivate_task(source_rq, p, 0);
+			set_task_cpu(p, target_rq->cpu);
+			activate_task(target_rq, p, 0);
 			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
 							p->comm,
 							source_rq->cpu,
@@ -119,12 +118,8 @@ void grr_load_balance(void)
 						minload.nr_running);
 		goto unlock;
 	}
-	printk(KERN_ERR "no need to loadbalance; maxload=%ld, minload=%ld\n",
-					maxload.nr_running,
-					minload.nr_running);
 	return;
 unlock:
-	printk(KERN_ERR "loadbalancing: END\n\n");
 	rcu_read_unlock();
 	double_rq_unlock(source_rq, target_rq);
 }
@@ -139,10 +134,10 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	unsigned long orig_nr;
 	unsigned long min_nr;
 
+	orig_cpu = task_cpu(p);
 	if (p->grr.nr_cpus_allowed == 1)
 		return orig_cpu;
 
-	orig_cpu = task_cpu(p);
 	orig_nr = cpu_rq(orig_cpu)->grr.grr_nr_running;
 	min_nr = orig_nr;
 
