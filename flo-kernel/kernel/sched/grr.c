@@ -43,15 +43,14 @@ void grr_load_balance(void)
 	struct rq *source_rq;
 	struct rq *target_rq;
 	struct task_struct *p;
+	unsigned long flags;
 	struct sched_grr_entity *grr_se;
 
 
 	printk(KERN_ERR "loadbalancing: START\n");
-
 	/* make sure everything is initialized */
-	maxload.nr_running = -1;
+	maxload.nr_running = 0;
 	minload.nr_running = 1000000;
-
 	/*
 	 * iterate through each CPU and
 	 * find the min and max load accros all CPUs
@@ -73,32 +72,17 @@ void grr_load_balance(void)
 		}
 		cpus_online++;
 	}
-	/* given the min and max load
-	 * decide if you should load balance
-	 */
-	if (maxload.nr_running > minload.nr_running+1) {
+	if (maxload.nr_running > minload.nr_running + 1) {
+
 		source_rq = maxload.rq;
 		target_rq = minload.rq;
-
+		local_irq_save(flags);
 		double_rq_lock(source_rq, target_rq);
-		rcu_read_lock();
 
-		/* find next movable task from source_rq */
 		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
-			/* get next eligible task from source_rq */
 			p = grr_task_of(grr_se);
-
-			if (p == NULL)
-				goto unlock;
-
-			if (!can_move_grr_task(p, source_rq, target_rq)) {
-//				printk(KERN_ERR "could not move task %s from CPU %d to CPU %d\n",
-//								p->comm,
-//								source_rq->cpu,
-//								target_rq->cpu);
+			if (!can_move_grr_task(p, source_rq, target_rq))
 				continue;
-			}
-
 			/*
 			 * move task p from source_rq to target_rq
 			 * see sched_move_task() in core.c for details
@@ -106,22 +90,17 @@ void grr_load_balance(void)
 			deactivate_task(source_rq, p, 0);
 			set_task_cpu(p, target_rq->cpu);
 			activate_task(target_rq, p, 0);
-			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
-							p->comm,
-							source_rq->cpu,
-							target_rq->cpu);
+//			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n", p->comm, source_rq->cpu, target_rq->cpu);
 			goto unlock;
 		}
-
-		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
-						maxload.nr_running,
-						minload.nr_running);
+//		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n", maxload.nr_running, minload.nr_running);
 		goto unlock;
 	}
 	return;
+
 unlock:
-	rcu_read_unlock();
 	double_rq_unlock(source_rq, target_rq);
+	local_irq_restore(flags);
 }
 
 static int
