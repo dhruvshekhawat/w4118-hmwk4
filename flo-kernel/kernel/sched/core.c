@@ -3897,7 +3897,7 @@ void rt_mutex_setprio(struct task_struct *p, int prio)
 		p->sched_class->put_prev_task(rq, p);
 
 
- #ifdef CONFIG_GRR
+#ifdef CONFIG_GRR
 	printk(KERN_ERR "rt_mutex_setprio\n");
 	if (is_grr_prio(p) && p->sched_class != &grr_sched_class)
 		p->sched_class = &grr_sched_class;
@@ -4151,11 +4151,11 @@ recheck:
 		policy &= ~SCHED_RESET_ON_FORK;
 
 		if (policy != SCHED_FIFO && policy != SCHED_RR &&
-				policy != SCHED_NORMAL && policy != SCHED_BATCH &&
+			policy != SCHED_NORMAL && policy != SCHED_BATCH &&
 #ifdef CONFIG_GRR
-				policy != SCHED_GRR &&
+			policy != SCHED_GRR &&
 #endif
-				policy != SCHED_IDLE)
+			policy != SCHED_IDLE)
 			return -EINVAL;
 	}
 
@@ -6925,24 +6925,25 @@ static int cpuset_cpu_inactive(struct notifier_block *nfb, unsigned long action,
  * Periodic load balancing every 500 ms
  */
 
-#define GRR_TIME_INTERVAL 500 * 1000 * 1000
+#define GRR_TIME_INTERVAL (500 * 1000 * 1000)
 
 static struct hrtimer grr_load_balance_timer;
 
 static enum hrtimer_restart __grr_load_balance(struct hrtimer *timer)
 {
 	grr_load_balance();
-	hrtimer_forward_now(&grr_load_balance_timer, ns_to_ktime(GRR_TIME_INTERVAL));
+	hrtimer_forward_now(&grr_load_balance_timer, 
+			    ns_to_ktime(GRR_TIME_INTERVAL));
 	return HRTIMER_RESTART;
 }
 
 static void init_grr_balancer(void)
 {
-	hrtimer_init(&grr_load_balance_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	hrtimer_init(&grr_load_balance_timer,
+		     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	grr_load_balance_timer.function = __grr_load_balance;
 	hrtimer_start(&grr_load_balance_timer,
-				  ns_to_ktime(GRR_TIME_INTERVAL),
-				  HRTIMER_MODE_REL);
+		      ns_to_ktime(GRR_TIME_INTERVAL), HRTIMER_MODE_REL);
 }
 #endif
 
@@ -8405,6 +8406,9 @@ struct cgroup_subsys cpuacct_subsys = {
 };
 #endif	/* CONFIG_CGROUP_CPUACCT */
 
+/*
+ * ------------------------------------------------
+ */
 #define FOREGROUND 1
 #define BACKGROUND 2
 #define UNIPROCESSOR (NR_CPUS == 1)
