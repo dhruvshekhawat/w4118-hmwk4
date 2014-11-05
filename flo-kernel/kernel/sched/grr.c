@@ -36,8 +36,8 @@ static int can_move_grr_task(struct task_struct *p,
 
 void grr_load_balance(void)
 {
-	int cpus_online;
 	unsigned long i;
+	int cpus_online, j;
 	struct load maxload;
 	struct load minload;
 	struct rq *source_rq;
@@ -46,10 +46,16 @@ void grr_load_balance(void)
 	unsigned long flags;
 	struct sched_grr_entity *grr_se;
 
-
 	printk(KERN_ERR "loadbalancing: START\n");
+
+#ifdef CONFIG_GRR_GROUPS /* for block start */
+	for (j = 1; j <= 2; j++) {
+#endif
+
+	cpus_online = 0;
 	maxload.nr_running = 0;
 	minload.nr_running = 1000000;
+
 	/*
 	 * iterate through each CPU and
 	 * find the min and max load accros all CPUs
@@ -58,6 +64,13 @@ void grr_load_balance(void)
 		struct rq *rq = cpu_rq(i);
 		struct grr_rq *grr_rq = &rq->grr;
 		unsigned long nr_running = grr_rq->grr_nr_running;
+
+#ifdef CONFIG_GRR_GROUPS
+		if (j == FOREGROUND && !rq->foreground)
+			continue;
+		if (j == BACKGROUND && !rq->background)
+			continue;
+#endif
 
 		if (nr_running > maxload.nr_running) {
 			maxload.nr_running = nr_running;
@@ -71,12 +84,20 @@ void grr_load_balance(void)
 		}
 		cpus_online++;
 	}
+
+	if (cpus_online == 1)
+		return;
+
 	if (maxload.nr_running > minload.nr_running + 1) {
 
 		source_rq = maxload.rq;
 		target_rq = minload.rq;
 		local_irq_save(flags);
 		double_rq_lock(source_rq, target_rq);
+
+		/* imbalance no longer valid */
+		if (source_rq->grr.grr_nr_running <= target_rq->grr.nr_running + 1)
+			return;
 
 		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
 			p = grr_task_of(grr_se);
@@ -104,6 +125,10 @@ void grr_load_balance(void)
 unlock:
 	double_rq_unlock(source_rq, target_rq);
 	local_irq_restore(flags);
+
+#ifdef CONFIG_GRR_GROUPS
+	}
+#endif /* for block end */
 }
 
 #endif /* CONFIG_SMP */
