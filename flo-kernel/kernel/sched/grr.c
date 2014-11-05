@@ -48,7 +48,6 @@ void grr_load_balance(void)
 
 
 	printk(KERN_ERR "loadbalancing: START\n");
-	/* make sure everything is initialized */
 	maxload.nr_running = 0;
 	minload.nr_running = 1000000;
 	/*
@@ -90,10 +89,14 @@ void grr_load_balance(void)
 			deactivate_task(source_rq, p, 0);
 			set_task_cpu(p, target_rq->cpu);
 			activate_task(target_rq, p, 0);
-//			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n", p->comm, source_rq->cpu, target_rq->cpu);
+/*			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
+ *				p->comm, source_rq->cpu, target_rq->cpu);
+ */
 			goto unlock;
 		}
-//		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n", maxload.nr_running, minload.nr_running);
+/*		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
+ *			maxload.nr_running, minload.nr_running);
+ */
 		goto unlock;
 	}
 	return;
@@ -106,24 +109,19 @@ unlock:
 #endif /* CONFIG_SMP */
 
 
-/*
- * Given a runqueue return the running queue of grr policy
- */
 static inline struct list_head *grr_queue_of_rq(struct rq *rq)
 {
 	return &rq->grr.queue;
 }
 
 /*
- * Update the current task's runtime statistics. Skip current tasks that
- * are not in our scheduling class.
+ * Update current task runtime statistics.
  */
 static void update_curr_grr(struct rq *rq)
 {
 	struct task_struct *curr = rq->curr;
 	u64 delta_exec;
 
-	//trace_printk("GRR: update_curr_grr\n");
 	if (curr->sched_class != &grr_sched_class)
 		return;
 
@@ -143,7 +141,6 @@ static void update_curr_grr(struct rq *rq)
 
 static void dequeue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se)
 {
-	//trace_printk("GRR: dequeue_grr_entity\n");
 	/*
 	 * Drop connection of this entity with runque but
 	 * reinitialize it to be reconnected later.
@@ -162,9 +159,7 @@ enqueue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se, bool head)
 	else
 		list_add_tail(&grr_se->task_queue, queue);
 	++rq->grr.grr_nr_running;
-	//printk(KERN_ERR "HO:AAAAAAA\n");
 }
-
 
 static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
 {
@@ -189,9 +184,8 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 
 		p->grr.timeout++;
 		next = DIV_ROUND_UP(min(soft, hard), USEC_PER_SEC/HZ);
-		if (p->grr.timeout > next) {
+		if (p->grr.timeout > next)
 			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
-		}
 	}
 }
 
@@ -236,11 +230,11 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 
 static void yield_task_grr(struct rq *rq)
 {
-	requeue_task_grr(rq,rq->curr, 0);
+	requeue_task_grr(rq, rq->curr, 0);
 }
 
 /*
- * Preempt the current task with a newly woken task if needed:
+ * grr_sched_class does no preemption
  */
 static void
 check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int flags)
@@ -251,8 +245,7 @@ check_preempt_curr_grr(struct rq *rq, struct task_struct *p, int flags)
 }
 
 /*
- * As we want a round robin we should put all of our task in a queue.
- * Then the pick_next_task will just get the head of this list
+ * Pick the task on the head of the runqueue (RR).
  */
 static struct task_struct *pick_next_task_grr(struct rq *rq)
 {
@@ -268,26 +261,32 @@ static struct task_struct *pick_next_task_grr(struct rq *rq)
 	p = grr_task_of(head);
 	if (!p)
 		return NULL;
-//	trace_printk("%s %d\n", p->comm, p->grr.time_slice);
+
 	p->se.exec_start = rq->clock;
+
 	return p;
 }
 
+/*
+ * Update statistics of a task which is (usually) about to be preempted.
+ */
 static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 {
-	/*
-	 * As we are round robin we should put the start
-	 * to 0 and update the current task
-	 */
 	update_curr_grr(rq);
+
+	/*
+	 * grr_sched_class uses a RR policy; thus, task should
+	 * start from 0.
+	 */
 	p->se.exec_start = 0;
 }
 
 #ifdef CONFIG_SMP
+
 /*
- * Select the runqueue with the least running tasks
+ * Select the runqueue with the least running tasks.
  *
- * Note that in case of unicore we only have one queue
+ * Note that in case of unicore we only have one queue.
  */
 static int
 select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
@@ -312,6 +311,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	rcu_read_lock();
 	for_each_online_cpu(i) {
 		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
+
 		if (!cpumask_test_cpu(i, &p->cpus_allowed))
 			continue;
 		if (grr_rq->grr_nr_running < min_nr) {
@@ -326,8 +326,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 #endif
 
 /*
- * register when a task start executing.
- * This is used by ... too...
+ * register when a task started executing.
  */
 static void set_curr_task_grr(struct rq *rq)
 {
@@ -337,7 +336,8 @@ static void set_curr_task_grr(struct rq *rq)
 }
 
 /*
- * used by scheduler_tick to #####
+ * used by scheduler_tick to provide the OS
+ * with periodic control on any running task
  */
 static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 {
@@ -377,7 +377,7 @@ prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
  */
 static void switched_to_grr(struct rq *rq, struct task_struct *p)
 {
-	if (p->on_rq && rq->curr != p )
+	if (p->on_rq && rq->curr != p)
 		if (rq == task_rq(p) && !rt_task(rq->curr))
 			resched_task(rq->curr);
 }
