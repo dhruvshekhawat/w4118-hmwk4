@@ -316,6 +316,10 @@ struct rt_rq {
 };
 
 #ifdef CONFIG_GRR
+#ifdef CONFIG_GRR_GROUPS
+    #define FOREGROUND 1
+    #define BACKGROUND 2
+#endif
 /* GRR classes' related field in a runqueue: */
 struct grr_rq {
 	unsigned long grr_nr_running;
@@ -324,7 +328,7 @@ struct grr_rq {
 	struct list_head queue;
 #endif
 };
-#endif
+#endif /* CONFIG_GRR */
 
 #ifdef CONFIG_SMP
 
@@ -380,7 +384,7 @@ struct rq {
 #endif
 	int skip_clock_update;
 
-#ifdef CONFIG_GRR
+#ifdef CONFIG_GRR_GROUPS
 	bool foreground; /* flag to store if cpu can handle foreground tasks */
 	bool background; /* flag to store if cpu can handle background tasks */
 #endif

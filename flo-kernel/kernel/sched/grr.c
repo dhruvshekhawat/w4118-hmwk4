@@ -6,18 +6,15 @@
 
 #include <linux/slab.h>
 
-#ifndef FOREGROUND
-#define FOREGROUND 1
-#endif
-#ifndef BACKRGOUND
-#define BACKGOUND 2
-#endif
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
 	return container_of(grr_se, struct task_struct, grr);
 }
 
 #ifdef CONFIG_SMP
+/*
+ * Load balancing is applicable only to multicore CPUs.
+ */
 struct load {
 	unsigned long nr_running;
 	struct rq *rq;
@@ -52,12 +49,13 @@ void grr_load_balance(void)
 	unsigned long flags;
 	struct sched_grr_entity *grr_se;
 
-	printk(KERN_ERR "loadbalancing: START\n");
+	trace_printk("Starting loadbalancing\n");
 
 #ifdef CONFIG_GRR_GROUPS /* for block start */
 	for (j = FOREGROUND; j <= BACKGROUND; j++) {
+#else
+	j = 1;
 #endif
-
 	cpus_online = 0;
 	maxload.nr_running = 0;
 	minload.nr_running = 1000000;
@@ -77,7 +75,6 @@ void grr_load_balance(void)
 		else if (j == BACKGROUND && !rq->background)
 			continue;
 #endif
-
 		if (nr_running > maxload.nr_running) {
 			maxload.nr_running = nr_running;
 			maxload.rq = rq;
@@ -90,11 +87,8 @@ void grr_load_balance(void)
 		}
 		cpus_online++;
 	}
-
 	if (cpus_online < 2)
 		return;
-
-	printk(KERN_ERR "LOADBALANCING ==> %d ; NUM_CORES = %d\n", j, cpus_online);
 
 	if (maxload.nr_running > minload.nr_running + 1) {
 
@@ -106,7 +100,7 @@ void grr_load_balance(void)
 		/* imbalance no longer valid */
 		if (source_rq->grr.grr_nr_running <=
 		    target_rq->grr.grr_nr_running + 1)
-			return;
+			goto unlock;
 
 		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
 			p = grr_task_of(grr_se);
@@ -119,27 +113,32 @@ void grr_load_balance(void)
 			deactivate_task(source_rq, p, 0);
 			set_task_cpu(p, target_rq->cpu);
 			activate_task(target_rq, p, 0);
-			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
-				p->comm, source_rq->cpu, target_rq->cpu);
-
+			trace_printk("Moved task %s of group %d from CPU %d to"
+				     " CPU %d\n", p->comm, j, source_rq->cpu,
+				     target_rq->cpu);
 			goto unlock;
 		}
-/*		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",
- *			maxload.nr_running, minload.nr_running);
- */
 		goto unlock;
 	}
+#ifdef CONFIG_GRR_GROUPS
+	trace_printk("Finished loadbalancing of group: %d (no migration)\n", j);
+	continue;
+#else
+	trace_printk("Finished loadbalancing (no migration)\n");
 	return;
+#endif
 
 unlock:
 	double_rq_unlock(source_rq, target_rq);
 	local_irq_restore(flags);
 
 #ifdef CONFIG_GRR_GROUPS
-	}
-#endif /* for block end */
+		trace_printk("Finished loadbalancing of group: %d\n", j);
+	} /* for block end */
+#else
+	trace_printk("Finished loadbalancing\n");
+#endif
 }
-
 #endif /* CONFIG_SMP */
 
 

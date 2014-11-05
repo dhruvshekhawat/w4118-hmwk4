@@ -93,6 +93,10 @@ ATOMIC_NOTIFIER_HEAD(migration_notifier_head);
 #define FOREGROUND 1
 #define BACKGROUND 2
 #define UNIPROCESSOR (NR_CPUS == 1)
+
+static void assign_cpu_to_group(int cpu, int group);
+static void assign_cpu_to_both_groups(int cpu);
+static int get_cgroup(struct task_struct *p);
 #endif
 
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
@@ -6954,6 +6958,10 @@ static void init_grr_balancer(void)
 
 void __init sched_init_smp(void)
 {
+#if defined(CONFIG_GRR)  && defined(CONFIG_GRR_GROUPS)
+	unsigned long cpu;
+	unsigned long group;
+#endif
 	cpumask_var_t non_isolated_cpus;
 
 	alloc_cpumask_var(&non_isolated_cpus, GFP_KERNEL);
@@ -6985,6 +6993,21 @@ void __init sched_init_smp(void)
 	init_sched_rt_class();
 
 #ifdef CONFIG_GRR
+#ifdef CONFIG_GRR_GROUPS
+	/*
+	 * Assign vCPUs of the same physical core to
+	 * the same group so that load balancing migtates
+	 * tasks that sit on the same L1 cache.
+	 */
+	group  = 0;
+	for_each_online_cpu(cpu) {
+		if (group / 2)
+			assign_cpu_to_group(cpu, BACKGROUND);
+		else
+			assign_cpu_to_group(cpu, FOREGROUND);
+		group = ++group % 4;
+	}
+#endif
 	init_grr_balancer();
 #endif
 }
@@ -7456,20 +7479,6 @@ void sched_move_task(struct task_struct *tsk)
 	if (tsk->sched_class->task_move_group)
 		tsk->sched_class->task_move_group(tsk, on_rq);
 	else
-#endif
-#ifdef CONFIG_GRR_GROUPS
-	/*
-	 * If it is groups call our task move group
-	 * which will return the correct rq to be put.
-	 * First unlock the previous lock of the rq so
-	 * no deadlock inside our task_move_group
-	 * and lock the lock of the new rq.
-	 */
-	if (tsk->sched_class->task_move_group) {
-		task_rq_unlock(rq, tsk, &flags);
-		tsk->sched_class->task_move_group(tsk, on_rq, rq);
-		task_rq_lock(rq, tsk, &flags);
-	}
 #endif
 		set_task_rq(tsk, task_cpu(tsk));
 
