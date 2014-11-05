@@ -422,6 +422,13 @@ get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 	return GRR_TIMESLICE;
 }
 
+static void task_move_group_grr(struct task_struct *p, int on_rq, struct rq *rq)
+{
+	/*
+	 * find best rq for the group and return it through the rq pointer
+	 */
+}
+
 /*
  * All the GRR scheduling class methods:
  */
