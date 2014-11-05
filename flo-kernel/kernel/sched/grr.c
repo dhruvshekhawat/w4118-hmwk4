@@ -66,9 +66,9 @@ void grr_load_balance(void)
 		unsigned long nr_running = grr_rq->grr_nr_running;
 
 #ifdef CONFIG_GRR_GROUPS
-		if (j == FOREGROUND && !rq->foreground)
+		if (j == 1 && !rq->foreground)
 			continue;
-		if (j == BACKGROUND && !rq->background)
+		else if (j == 2 && !rq->background)
 			continue;
 #endif
 
@@ -85,8 +85,10 @@ void grr_load_balance(void)
 		cpus_online++;
 	}
 
-	if (cpus_online == 1)
+	if (cpus_online < 2)
 		return;
+
+	printk(KERN_ERR "LOADBALANCING ==> %d ; NUM_CORES = %d\n", j, cpus_online);
 
 	if (maxload.nr_running > minload.nr_running + 1) {
 
@@ -96,7 +98,7 @@ void grr_load_balance(void)
 		double_rq_lock(source_rq, target_rq);
 
 		/* imbalance no longer valid */
-		if (source_rq->grr.grr_nr_running <= target_rq->grr.nr_running + 1)
+		if (source_rq->grr.grr_nr_running <= target_rq->grr.grr_nr_running + 1)
 			return;
 
 		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
@@ -110,9 +112,9 @@ void grr_load_balance(void)
 			deactivate_task(source_rq, p, 0);
 			set_task_cpu(p, target_rq->cpu);
 			activate_task(target_rq, p, 0);
-/*			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
- *				p->comm, source_rq->cpu, target_rq->cpu);
- */
+			printk(KERN_ERR "moved task %s from CPU %d to CPU %d\n",
+				p->comm, source_rq->cpu, target_rq->cpu);
+
 			goto unlock;
 		}
 /*		printk(KERN_ERR "no task moved; maxload=%ld, minload=%ld\n",

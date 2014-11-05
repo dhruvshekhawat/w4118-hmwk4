@@ -89,6 +89,12 @@
 
 ATOMIC_NOTIFIER_HEAD(migration_notifier_head);
 
+#ifdef CONFIG_GRR_GROUPS
+#define FOREGROUND 1
+#define BACKGROUND 2
+#define UNIPROCESSOR (NR_CPUS == 1)
+#endif
+
 void start_bandwidth_timer(struct hrtimer *period_timer, ktime_t period)
 {
 	unsigned long delta;
@@ -6932,7 +6938,7 @@ static struct hrtimer grr_load_balance_timer;
 static enum hrtimer_restart __grr_load_balance(struct hrtimer *timer)
 {
 	grr_load_balance();
-	hrtimer_forward_now(&grr_load_balance_timer, 
+	hrtimer_forward_now(&grr_load_balance_timer,
 			    ns_to_ktime(GRR_TIME_INTERVAL));
 	return HRTIMER_RESTART;
 }
@@ -6978,6 +6984,7 @@ void __init sched_init_smp(void)
 	free_cpumask_var(non_isolated_cpus);
 
 	init_sched_rt_class();
+
 #ifdef CONFIG_GRR
 	init_grr_balancer();
 #endif
@@ -8409,10 +8416,6 @@ struct cgroup_subsys cpuacct_subsys = {
 /*
  * ------------------------------------------------
  */
-#define FOREGROUND 1
-#define BACKGROUND 2
-#define UNIPROCESSOR (NR_CPUS == 1)
-
 static void assign_cpu_to_group(int cpu, int group)
 {
 	struct rq *rq = cpu_rq(cpu);
