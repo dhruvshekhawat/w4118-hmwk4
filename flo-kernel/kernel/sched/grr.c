@@ -6,6 +6,12 @@
 
 #include <linux/slab.h>
 
+#ifndef FOREGROUND
+#define FOREGROUND 1
+#endif
+#ifndef BACKRGOUND
+#define BACKGOUND 2
+#endif
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
 	return container_of(grr_se, struct task_struct, grr);
@@ -49,7 +55,7 @@ void grr_load_balance(void)
 	printk(KERN_ERR "loadbalancing: START\n");
 
 #ifdef CONFIG_GRR_GROUPS /* for block start */
-	for (j = 1; j <= 2; j++) {
+	for (j = FOREGROUND; j <= BACKGROUND; j++) {
 #endif
 
 	cpus_online = 0;
@@ -66,9 +72,9 @@ void grr_load_balance(void)
 		unsigned long nr_running = grr_rq->grr_nr_running;
 
 #ifdef CONFIG_GRR_GROUPS
-		if (j == 1 && !rq->foreground)
+		if (j == FOREGROUND && !rq->foreground)
 			continue;
-		else if (j == 2 && !rq->background)
+		else if (j == BACKGROUND && !rq->background)
 			continue;
 #endif
 

@@ -248,9 +248,9 @@ void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq)
 	SEQ_printf(m, "\ngrr_rq[%d]:\n", cpu);
 
 #define P(x) \
-	SEQ_printf(m, "  .%-30s: %Ld\n", #x, (long long)(grr_rq->x))
+	SEQ_printf(m, "  .%-30s: %lld\n", #x, (long long)(grr_rq->x))
 #define PN(x) \
-	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", #x, SPLIT_NS(grr_rq->x))
+	SEQ_printf(m, "  .%-30s: %lld.%06ld\n", #x, SPLIT_NS(grr_rq->x))
 
 	P(grr_nr_running);
 

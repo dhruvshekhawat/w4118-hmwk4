@@ -12,7 +12,7 @@ int main(int argc, char **argv)
 		m = atoi(argv[2]);
 	} else {
 		printf("Usage: %s <num_cores> <group>\n", *argv);
-		return -1;
+		return -EINVAL;
 	}
 
 	ret = syscall(378, n, m);
