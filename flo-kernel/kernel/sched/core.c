@@ -4107,8 +4107,7 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	if (is_grr_prio(p) &&  p->sched_class != &grr_sched_class) {
 		p->sched_class = &grr_sched_class;
 		printk(KERN_ERR "change class\n");
-	}
-	else
+	} else
 #endif
 	if (rt_prio(p->prio))
 		p->sched_class = &rt_sched_class;

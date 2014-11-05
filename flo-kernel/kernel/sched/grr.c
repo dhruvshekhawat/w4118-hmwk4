@@ -104,7 +104,8 @@ void grr_load_balance(void)
 		double_rq_lock(source_rq, target_rq);
 
 		/* imbalance no longer valid */
-		if (source_rq->grr.grr_nr_running <= target_rq->grr.grr_nr_running + 1)
+		if (source_rq->grr.grr_nr_running <=
+		    target_rq->grr.grr_nr_running + 1)
 			return;
 
 		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {

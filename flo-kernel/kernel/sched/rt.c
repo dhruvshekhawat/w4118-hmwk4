@@ -2035,7 +2035,7 @@ static unsigned int get_rr_interval_rt(struct rq *rq, struct task_struct *task)
 		return 0;
 }
 
-const struct sched_class rt_sched_class = {			/* SCHED_FIFO and SCHED_RR */
+const struct sched_class rt_sched_class = {	/* SCHED_FIFO and SCHED_RR */
 #ifdef CONFIG_GRR
 	.next			= &grr_sched_class,
 #else
