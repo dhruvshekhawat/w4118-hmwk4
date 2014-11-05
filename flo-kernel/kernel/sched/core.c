@@ -7475,10 +7475,27 @@ void sched_move_task(struct task_struct *tsk)
 	if (unlikely(running))
 		tsk->sched_class->put_prev_task(rq, tsk);
 
+#if defined(CONFIG_FAIR_GROUP_SCHED) || defined(CONFIG_GRR_GROUPS)
+	/*
+	 * If it is groups call our task move group
+	 * which will change the correct rq to be put.
+	 * First unlock the previous lock of the rq so
+	 * no deadlock inside our task_move_group
+	 * and lock the lock of the new rq.
+	 */
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	if (tsk->sched_class->task_move_group)
 		tsk->sched_class->task_move_group(tsk, on_rq);
 	else
+#endif
+#ifdef CONFIG_GRR_GROUPS
+	if (tsk->sched_class->task_move_group) {
+		task_rq_unlock(rq, tsk, &flags);
+		tsk->sched_class->task_move_group(tsk, on_rq);
+		rq = task_rq_lock(tsk, &flags);
+	} else
+
+#endif
 #endif
 		set_task_rq(tsk, task_cpu(tsk));
 

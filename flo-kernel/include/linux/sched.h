@@ -1161,6 +1161,9 @@ struct sched_class {
 
 	unsigned int (*get_rr_interval) (struct rq *rq,
 					 struct task_struct *task);
+#ifdef CONFIG_GRR_GROUPS
+	void (*task_change_rq) (struct task_struct *p, struct rq *rq);
+#endif
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	void (*task_move_group) (struct task_struct *p, int on_rq);

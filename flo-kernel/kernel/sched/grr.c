@@ -5,7 +5,9 @@
 #include "sched.h"
 
 #include <linux/slab.h>
+#include <linux/limits.h>
 
+static char group_path[PATH_MAX];
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
 	return container_of(grr_se, struct task_struct, grr);
@@ -421,11 +423,44 @@ get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 	return GRR_TIMESLICE;
 }
 
-static void task_move_group_grr(struct task_struct *p, int on_rq, struct rq *rq)
+static char *task_group_path(struct task_group *tg)
+{
+	if (autogroup_path(tg, group_path, PATH_MAX))
+		return group_path;
+	if (!tg->css.cgroup) {
+		group_path[0] = '\0';
+		return group_path;
+	}
+	cgroup_path(tg->css.cgroup, group_path, PATH_MAX);
+	return group_path;
+}
+
+static void task_move_group_grr(struct task_struct *p, int on_rq)
 {
 	/*
 	 * find best rq for the group and return it through the rq pointer
 	 */
+	unsigned long i;
+	int group_length = 0;
+	char * g_p = task_group_path(task_group(p));
+	group_length = strlen(g_p);
+	if (group_length > 5) {
+		/* BACKGROUND */
+		for_each_online_cpu(i) {
+			struct rq *rq = cpu_rq(i);
+			if (rq->background)
+				set_task_rq(p, rq->cpu);
+		}
+
+	} else {
+		/*FOREGROUND */
+		for_each_online_cpu(i) {
+			struct rq *rq = cpu_rq(i);
+			if (rq->foreground)
+				set_task_rq(p, rq->cpu);
+		}
+	}
+	set_task_rq(p, task_cpu(p));
 }
 
 /*
@@ -450,7 +485,7 @@ const struct sched_class grr_sched_class = {
 	.get_rr_interval	= get_rr_interval_grr,
 
 #ifdef CONFIG_GRR_GROUP_SCHED
-	.task_move_group	= task_move_group_grr,
+	.task_move_group 	= task_move_group_grr,
 #endif
 };
 
