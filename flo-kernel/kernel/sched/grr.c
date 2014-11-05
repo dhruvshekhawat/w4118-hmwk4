@@ -103,48 +103,8 @@ unlock:
 	local_irq_restore(flags);
 }
 
-static int
-select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
-{
-	int i;
-	struct rq *rq;
-	int min_cpu;
-	int orig_cpu;
-	unsigned long orig_nr;
-	unsigned long min_nr;
-
-	orig_cpu = task_cpu(p);
-	if (p->grr.nr_cpus_allowed == 1)
-		return orig_cpu;
-
-	orig_nr = cpu_rq(orig_cpu)->grr.grr_nr_running;
-	min_nr = orig_nr;
-
-	rq = cpu_rq(orig_cpu);
-	min_cpu = orig_cpu;
-
-	rcu_read_lock();
-	for_each_online_cpu(i) {
-		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
-		if (!cpumask_test_cpu(i, &p->cpus_allowed))
-			continue;
-		if (grr_rq->grr_nr_running < min_nr) {
-			min_nr = grr_rq->grr_nr_running;
-			min_cpu = i;
-		}
-	}
-	rcu_read_unlock();
-
-	return min_cpu;
-}
 #endif /* CONFIG_SMP */
 
-void init_grr_rq(struct grr_rq *grr_rq)
-{
-	INIT_LIST_HEAD(&grr_rq->queue);
-	grr_rq->grr_nr_running = 0;
-
-}
 
 /*
  * Given a runqueue return the running queue of grr policy
@@ -205,9 +165,52 @@ enqueue_grr_entity(struct rq *rq, struct sched_grr_entity *grr_se, bool head)
 	//printk(KERN_ERR "HO:AAAAAAA\n");
 }
 
+
+static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
+{
+	struct sched_grr_entity *grr_se = &p->grr;
+	struct list_head *queue = grr_queue_of_rq(rq);
+
+	if (head)
+		list_move(&grr_se->task_queue, queue);
+	else
+		list_move_tail(&grr_se->task_queue, queue);
+}
+
+static void watchdog(struct rq *rq, struct task_struct *p)
+{
+	unsigned long soft, hard;
+
+	soft = task_rlimit(p, RLIMIT_RTTIME);
+	hard = task_rlimit_max(p, RLIMIT_RTTIME);
+
+	if (soft != RLIM_INFINITY) {
+		unsigned long next;
+
+		p->grr.timeout++;
+		next = DIV_ROUND_UP(min(soft, hard), USEC_PER_SEC/HZ);
+		if (p->grr.timeout > next) {
+			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
+		}
+	}
+}
+
 /*
- * Adding/removing a task to/from a priority array:
+ * --------------------------------------------------------------
+ *
+ * Ok, enough with helpers,
+ *
+ * Implement the metchods required for grr_sched_class scheduler
+ *
+ * ---------------------------------------------------------------
  */
+void init_grr_rq(struct grr_rq *grr_rq)
+{
+	INIT_LIST_HEAD(&grr_rq->queue);
+	grr_rq->grr_nr_running = 0;
+
+}
+
 static void
 enqueue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 {
@@ -229,17 +232,6 @@ dequeue_task_grr(struct rq *rq, struct task_struct *p, int flags)
 
 	dequeue_grr_entity(rq, grr_se);
 	dec_nr_running(rq);
-}
-
-static void requeue_task_grr(struct rq *rq, struct task_struct *p, int head)
-{
-	struct sched_grr_entity *grr_se = &p->grr;
-	struct list_head *queue = grr_queue_of_rq(rq);
-
-	if (head)
-		list_move(&grr_se->task_queue, queue);
-	else
-		list_move_tail(&grr_se->task_queue, queue);
 }
 
 static void yield_task_grr(struct rq *rq)
@@ -291,53 +283,62 @@ static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 	p->se.exec_start = 0;
 }
 
+#ifdef CONFIG_SMP
 /*
- * When switching a task to RT, we may overload the runqueue
- * with RT tasks. In this case we try to push them off to
- * other runqueues.
+ * Select the runqueue with the least running tasks
+ *
+ * Note that in case of unicore we only have one queue
  */
-static void switched_to_grr(struct rq *rq, struct task_struct *p)
+static int
+select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
-	/*
-	 * If the running proccess in not real time then
-	 * this process must execute
-	 */
-	if (p->on_rq && rq->curr != p )
-		if (rq == task_rq(p) && !rt_task(rq->curr))
-			resched_task(rq->curr);
-}
+	int i;
+	struct rq *rq;
+	int min_cpu;
+	int orig_cpu;
+	unsigned long orig_nr;
+	unsigned long min_nr;
 
-/*
- * Priority of the task has changed. This may cause
- * us to initiate a push or pull.
- */
-static void
-prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
-{
-	(void)rq;
-	(void)p;
-	(void)oldprio;
-}
+	orig_cpu = task_cpu(p);
+	if (p->grr.nr_cpus_allowed == 1)
+		return orig_cpu;
 
-static void watchdog(struct rq *rq, struct task_struct *p)
-{
-	unsigned long soft, hard;
+	orig_nr = cpu_rq(orig_cpu)->grr.grr_nr_running;
+	min_nr = orig_nr;
 
-	/* max may change after cur was read, this will be fixed next tick */
-	soft = task_rlimit(p, RLIMIT_RTTIME);
-	hard = task_rlimit_max(p, RLIMIT_RTTIME);
+	rq = cpu_rq(orig_cpu);
+	min_cpu = orig_cpu;
 
-	if (soft != RLIM_INFINITY) {
-		unsigned long next;
-
-		p->grr.timeout++;
-		next = DIV_ROUND_UP(min(soft, hard), USEC_PER_SEC/HZ);
-		if (p->grr.timeout > next) {
-			p->cputime_expires.sched_exp = p->se.sum_exec_runtime;
+	rcu_read_lock();
+	for_each_online_cpu(i) {
+		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
+		if (!cpumask_test_cpu(i, &p->cpus_allowed))
+			continue;
+		if (grr_rq->grr_nr_running < min_nr) {
+			min_nr = grr_rq->grr_nr_running;
+			min_cpu = i;
 		}
 	}
+	rcu_read_unlock();
+
+	return min_cpu;
+}
+#endif
+
+/*
+ * register when a task start executing.
+ * This is used by ... too...
+ */
+static void set_curr_task_grr(struct rq *rq)
+{
+	struct task_struct *p = rq->curr;
+
+	p->se.exec_start = rq->clock_task;
 }
 
+/*
+ * used by scheduler_tick to #####
+ */
 static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 {
 	struct list_head *queue = grr_queue_of_rq(rq);
@@ -358,11 +359,27 @@ static void task_tick_grr(struct rq *rq, struct task_struct *p, int queued)
 	}
 }
 
-static void set_curr_task_grr(struct rq *rq)
+/*
+ * grr_sched_class has no notion of prio
+ */
+static void
+prio_changed_grr(struct rq *rq, struct task_struct *p, int oldprio)
 {
-	struct task_struct *p = rq->curr;
+	(void)rq;
+	(void)p;
+	(void)oldprio;
+}
 
-	p->se.exec_start = rq->clock_task;
+/*
+ * When switching a task to GRR, we may overload the
+ * runqueue with GRR tasks. In this case we try to
+ * push them off to other runqueues.
+ */
+static void switched_to_grr(struct rq *rq, struct task_struct *p)
+{
+	if (p->on_rq && rq->curr != p )
+		if (rq == task_rq(p) && !rt_task(rq->curr))
+			resched_task(rq->curr);
 }
 
 static inline unsigned int
@@ -371,9 +388,8 @@ get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 	return GRR_TIMESLICE;
 }
 
-
 /*
- * All the scheduling class methods:
+ * All the GRR scheduling class methods:
  */
 const struct sched_class grr_sched_class = {
 	.next			= &fair_sched_class,
@@ -383,6 +399,7 @@ const struct sched_class grr_sched_class = {
 	.check_preempt_curr	= check_preempt_curr_grr,
 	.pick_next_task		= pick_next_task_grr,
 	.put_prev_task		= put_prev_task_grr,
+
 #ifdef CONFIG_SMP
 	.select_task_rq		= select_task_rq_grr,
 #endif
@@ -391,15 +408,14 @@ const struct sched_class grr_sched_class = {
 	.prio_changed		= prio_changed_grr,
 	.switched_to		= switched_to_grr,
 	.get_rr_interval	= get_rr_interval_grr,
+
 #ifdef CONFIG_GRR_GROUP_SCHED
 	.task_move_group	= task_move_group_grr,
 #endif
 };
 
 #ifdef CONFIG_SCHED_DEBUG
-extern void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq);
-
 void print_grr_stats(struct seq_file *m, int cpu)
 {
 }
-#endif /* CONFIG_SCHED_DEBUG */
+#endif

@@ -6921,7 +6921,12 @@ static int cpuset_cpu_inactive(struct notifier_block *nfb, unsigned long action,
 }
 
 #ifdef CONFIG_GRR
+/*
+ * Periodic load balancing every 500 ms
+ */
+
 #define GRR_TIME_INTERVAL 500 * 1000 * 1000
+
 static struct hrtimer grr_load_balance_timer;
 
 static enum hrtimer_restart __grr_load_balance(struct hrtimer *timer)
@@ -6976,6 +6981,7 @@ void __init sched_init_smp(void)
 	init_grr_balancer();
 #endif
 }
+
 #else
 void __init sched_init_smp(void)
 {
@@ -7078,6 +7084,7 @@ void __init sched_init(void)
 #ifdef CONFIG_GRR
 		init_grr_rq(&rq->grr);
 #endif
+
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.shares = ROOT_TASK_GROUP_LOAD;
 		INIT_LIST_HEAD(&rq->leaf_cfs_rq_list);
@@ -7166,12 +7173,10 @@ void __init sched_init(void)
 	calc_load_update = jiffies + LOAD_FREQ;
 
 #ifdef CONFIG_GRR
-//#ifdef CONFIG_GRR_AT_BOOT_UP
 	/*
 	 * During early bootup we pretend to be a grr task:
 	 */
 	current->sched_class = &grr_sched_class;
-//#endif
 #else
 	/*
 	 * During early bootup we pretend to be a normal task:
