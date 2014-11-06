@@ -127,6 +127,10 @@ struct task_group {
 	struct rt_bandwidth rt_bandwidth;
 #endif
 
+#ifdef CONFIG_GRR_GROUPS
+	struct sched_grr_entity **grr_se;
+	struct grr_rq **grr_rq;
+#endif
 	struct rcu_head rcu;
 	struct list_head list;
 
@@ -326,6 +330,7 @@ struct grr_rq {
 #ifdef CONFIG_RT_GROUP_SCHED
 	struct rq *rq;
 	struct list_head queue;
+	struct task_group *tg;
 #endif
 };
 #endif /* CONFIG_GRR */
@@ -606,9 +611,6 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 #ifdef CONFIG_RT_GROUP_SCHED
 	p->rt.rt_rq  = tg->rt_rq[cpu];
 	p->rt.parent = tg->rt_se[cpu];
-#endif
-#ifdef CONFIG_GRR_GROUPS
-	//p->grr.grr_rq = &cpu_rq(cpu)->grr;
 #endif
 }
 

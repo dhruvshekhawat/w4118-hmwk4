@@ -517,7 +517,7 @@ static inline void init_hrtick(void)
 #endif	/* CONFIG_SCHED_HRTICK */
 
 /*
- * resched_task - mark a task 'to be rescheduled now'.
+ * sched_task - mark a task 'to be rescheduled now'.
  *
  * On UP this means the setting of the need_resched flag, on SMP it
  * might also involve a cross-CPU call to trigger the scheduler on
@@ -7465,6 +7465,13 @@ void sched_move_task(struct task_struct *tsk)
 	unsigned long flags;
 	struct rq *rq;
 
+#ifdef CONFIG_GRR_GROUPS
+	on_rq = 0;
+	if (tsk->sched_class->task_move_group)
+		tsk->sched_class->task_move_group(tsk, on_rq);
+	return;
+#endif
+
 	rq = task_rq_lock(tsk, &flags);
 
 	running = task_current(rq, tsk);
@@ -7475,7 +7482,7 @@ void sched_move_task(struct task_struct *tsk)
 	if (unlikely(running))
 		tsk->sched_class->put_prev_task(rq, tsk);
 
-#if defined(CONFIG_FAIR_GROUP_SCHED) || defined(CONFIG_GRR_GROUPS)
+#if defined(CONFIG_FAIR_GROUP_SCHED)
 	/*
 	 * If it is groups call our task move group
 	 * which will change the correct rq to be put.
@@ -7487,14 +7494,6 @@ void sched_move_task(struct task_struct *tsk)
 	if (tsk->sched_class->task_move_group)
 		tsk->sched_class->task_move_group(tsk, on_rq);
 	else
-#endif
-#ifdef CONFIG_GRR_GROUPS
-	if (tsk->sched_class->task_move_group) {
-		task_rq_unlock(rq, tsk, &flags);
-		tsk->sched_class->task_move_group(tsk, on_rq);
-		rq = task_rq_lock(tsk, &flags);
-	} else
-
 #endif
 #endif
 		set_task_rq(tsk, task_cpu(tsk));

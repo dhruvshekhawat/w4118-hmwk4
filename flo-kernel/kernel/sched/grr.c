@@ -448,55 +448,57 @@ static char *task_group_path(struct task_group *tg)
 
 static void task_move_group_grr(struct task_struct *p, int on_rq)
 {
-	/*
-	 * find best rq for the group and return it through the rq pointer
-	 */
-	unsigned int i;
-	int len = 0;
+
+	unsigned long i;
+	unsigned long flags;
+	struct rq *target_rq;
+	struct rq *source_rq;
 	char *grouppath = task_group_path(task_group(p));
-	len = strlen(grouppath);
 
-	////
-	if (len > 5) {
-		for_each_online_cpu(i) {
-			struct rq *rq = cpu_rq(i);
-			if (rq->background) {
-				unsigned long flags;
-//				local_irq_save(flags);
-//				double_rq_lock(task_rq(p), rq);
-//				deactivate_task(task_rq(p), p, 0);
-//				set_task_cpu(p, i);
-				printk(KERN_ERR "BEFORE.............\n");
-				set_task_rq(p, task_cpu(p));
-				printk(KERN_ERR "AFTER.............\n");
-//				activate_task(task_rq(p), p, 0);
-//				double_rq_unlock(task_rq(p), rq);
-//				local_irq_restore(flags);
-				break;
-			}
-		}
+	
+	int ttt = select_task_rq_grr(p, 0, 0);
+	target_rq = cpu_rq(ttt);
+	source_rq = task_rq(p);
 
-	} else {
-		for_each_online_cpu(i) {
-			struct rq *rq = cpu_rq(i);
-			if (rq->foreground) {
-				unsigned long flags;
-//				local_irq_save(flags);
-//				double_rq_lock(task_rq(p), rq);
-//				deactivate_task(task_rq(p), p, 0);
-//				set_task_rq(p, i);
-//
-				printk(KERN_ERR "BEFORE.............\n");
-				set_task_cpu(p, task_cpu(p));
-				printk(KERN_ERR "AFTER.............\n");
-//				activate_task(task_rq(p), p, 0);
-//				double_rq_unlock(task_rq(p), rq);
-//				local_irq_restore(flags);
-				break;
-			}
-		}
+
+	local_irq_save(flags);
+	double_rq_lock(source_rq, target_rq);
+	printk(KERN_ERR "Will go to:%d\n", ttt);
+	/* Now that we hold the lock, are you still in the same rq? */
+	if (!can_move_grr_task(p, source_rq, target_rq))
+	{
+		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
+		goto unlock;
 	}
-	////
+
+	if (task_rq(p) != source_rq)
+	{
+		printk(KERN_ERR "OPSSSSSSSSSSSS2\n");
+		goto unlock;
+	}
+	/* maybe unnecessary */
+	if (target_rq == source_rq )
+	{
+		printk(KERN_ERR "OPSSSSSSSSSSSS3\n");
+		goto unlock;
+	}
+
+
+
+	if (p->state != TASK_RUNNING && p->state != TASK_WAKING
+	    && !(task_thread_info(p)->preempt_count & PREEMPT_ACTIVE))
+	{
+		printk(KERN_ERR "OPSSSSSSSSSSSS4\n");
+		goto unlock;
+	}
+	printk(KERN_ERR "NOOOOOOOOOO---OPSSSSSSSSSSSS\n");
+	deactivate_task(source_rq, p, 0);
+	set_task_cpu(p, target_rq->cpu);
+	activate_task(target_rq, p, 0);
+
+unlock:
+	double_rq_unlock(source_rq, target_rq);
+	local_irq_restore(flags);
 }
 
 /*
