@@ -127,10 +127,6 @@ struct task_group {
 	struct rt_bandwidth rt_bandwidth;
 #endif
 
-#ifdef CONFIG_GRR_GROUPS
-	struct sched_grr_entity **grr_se;
-	struct grr_rq **grr_rq;
-#endif
 	struct rcu_head rcu;
 	struct list_head list;
 
@@ -412,10 +408,6 @@ struct rq {
 #ifdef CONFIG_RT_GROUP_SCHED
 	struct list_head leaf_rt_rq_list;
 #endif
-#ifdef CONFIG_GRR
-	struct list_head leaf_grr_rq_list;
-#endif
-
 	/*
 	 * This is part of a global counter where only the total sum
 	 * over all CPUs matters. A task can increase this counter on

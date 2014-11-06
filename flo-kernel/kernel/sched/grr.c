@@ -7,13 +7,6 @@
 #include <linux/slab.h>
 #include <linux/limits.h>
 
-static char group_path[PATH_MAX];
-static char *task_group_path(struct task_group *tg);
-
-static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
-{
-	return container_of(grr_se, struct task_struct, grr);
-}
 
 #ifdef CONFIG_SMP
 /*
@@ -25,6 +18,16 @@ struct load {
 	int cpu;
 };
 
+static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se);
+
+#ifdef CONFIG_GRR_GROUPS
+static char group_path[PATH_MAX];
+static char *task_group_path(struct task_group *tg);
+#endif
+
+/*
+ * Helper to do...
+ */
 static int can_move_grr_task(struct task_struct *p,
 			     struct rq *source,
 			     struct rq *target)
@@ -41,6 +44,9 @@ static int can_move_grr_task(struct task_struct *p,
 	return 1;
 }
 
+/*
+ * Load balancer that does...
+ */
 void grr_load_balance(void)
 {
 	unsigned long i;
@@ -55,7 +61,7 @@ void grr_load_balance(void)
 
 	trace_printk("Starting loadbalancing\n");
 
-#ifdef CONFIG_GRR_GROUPS /* for block start */
+#ifdef CONFIG_GRR_GROUPS 
 	for (j = FOREGROUND; j <= BACKGROUND; j++) {
 #else
 	j = 1;
@@ -145,6 +151,10 @@ unlock:
 }
 #endif /* CONFIG_SMP */
 
+static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
+{
+	return container_of(grr_se, struct task_struct, grr);
+}
 
 static inline struct list_head *grr_queue_of_rq(struct rq *rq)
 {
@@ -459,24 +469,27 @@ static void task_move_group_grr(struct task_struct *p, int on_rq)
 	int ttt = select_task_rq_grr(p, 0, 0);
 	target_rq = cpu_rq(ttt);
 	source_rq = task_rq(p);
-	if (!can_move_grr_task(p, source_rq, target_rq))
-	{
-		printk(KERN_ERR "NO LOCK\n");
-		return;
-	}
+	
+//	if (!can_move_grr_task(p, source_rq, target_rq))
+//	{
+//		printk(KERN_ERR "NO LOCK\n");
+//		return;
+//	}
 
 	local_irq_save(flags);
 	double_rq_lock(source_rq, target_rq);
 	printk(KERN_ERR "Will go to:%d\n", ttt);
-	/* Now that we hold the lock, are you still in the same rq? */
-	if (!can_move_grr_task(p, source_rq, target_rq))
-	{
-		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
-		goto unlock;
 
+	/* Now that we hold the lock, are you still in the same rq? */
 	if (task_rq(p) != source_rq)
 	{
 		printk(KERN_ERR "OPSSSSSSSSSSSS2\n");
+		goto unlock;
+	}
+
+	if (!can_move_grr_task(p, source_rq, target_rq))
+	{
+		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
 		goto unlock;
 	}
 	/* maybe unnecessary */
@@ -526,9 +539,3 @@ const struct sched_class grr_sched_class = {
 	.switched_to		= switched_to_grr,
 	.get_rr_interval	= get_rr_interval_grr,
 };
-
-#ifdef CONFIG_SCHED_DEBUG
-void print_grr_stats(struct seq_file *m, int cpu)
-{
-}
-#endif

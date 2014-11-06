@@ -90,10 +90,6 @@
 ATOMIC_NOTIFIER_HEAD(migration_notifier_head);
 
 #ifdef CONFIG_GRR_GROUPS
-#define FOREGROUND 1
-#define BACKGROUND 2
-#define UNIPROCESSOR (NR_CPUS == 1)
-
 static void assign_cpu_to_group(int cpu, int group);
 static void assign_cpu_to_both_groups(int cpu);
 static int get_cgroup(struct task_struct *p);
@@ -4108,10 +4104,9 @@ __setscheduler(struct rq *rq, struct task_struct *p, int policy, int prio)
 	/* we are holding p->pi_lock already */
 	p->prio = rt_mutex_getprio(p);
 #ifdef CONFIG_GRR
-	if (is_grr_prio(p) &&  p->sched_class != &grr_sched_class) {
+	if (is_grr_prio(p) &&  p->sched_class != &grr_sched_class)
 		p->sched_class = &grr_sched_class;
-		printk(KERN_ERR "change class\n");
-	} else
+	else
 #endif
 	if (rt_prio(p->prio))
 		p->sched_class = &rt_sched_class;
@@ -8505,7 +8500,7 @@ SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 	if (group != 1 && group != 2)
 		return -EINVAL;
 
-	if (UNIPROCESSOR) {
+	if (NR_CPUS == 1) {
 		assign_cpu_to_both_groups(cpu);
 		return 0;
 	}
