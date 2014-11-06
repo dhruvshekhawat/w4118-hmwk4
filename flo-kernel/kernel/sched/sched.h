@@ -607,6 +607,9 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 	p->rt.rt_rq  = tg->rt_rq[cpu];
 	p->rt.parent = tg->rt_se[cpu];
 #endif
+#ifdef CONFIG_GRR_GROUPS
+	//p->grr.grr_rq = &cpu_rq(cpu)->grr;
+#endif
 }
 
 #else /* CONFIG_CGROUP_SCHED */

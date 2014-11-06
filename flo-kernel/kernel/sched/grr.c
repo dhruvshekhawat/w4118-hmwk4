@@ -8,6 +8,8 @@
 #include <linux/limits.h>
 
 static char group_path[PATH_MAX];
+static char *task_group_path(struct task_group *tg);
+
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
 	return container_of(grr_se, struct task_struct, grr);
@@ -326,12 +328,16 @@ static void put_prev_task_grr(struct rq *rq, struct task_struct *p)
 static int
 select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 {
-	int i;
+
 	struct rq *rq;
 	int min_cpu;
 	int orig_cpu;
 	unsigned long orig_nr;
+	unsigned long i;
 	unsigned long min_nr;
+        int len = 0;
+	char *grouppath = task_group_path(task_group(p));
+	len = strlen(grouppath);
 
 	orig_cpu = task_cpu(p);
 	if (p->grr.nr_cpus_allowed == 1)
@@ -346,7 +352,12 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	rcu_read_lock();
 	for_each_online_cpu(i) {
 		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
-
+#ifdef CONFIG_GRR_GROUPS
+		if (len > 5 && rq->foreground)
+			continue;
+		if (len <= 5 && rq->background)
+			continue;
+#endif
 		if (!cpumask_test_cpu(i, &p->cpus_allowed))
 			continue;
 		if (grr_rq->grr_nr_running < min_nr) {
@@ -440,27 +451,52 @@ static void task_move_group_grr(struct task_struct *p, int on_rq)
 	/*
 	 * find best rq for the group and return it through the rq pointer
 	 */
-	unsigned long i;
-	int group_length = 0;
-	char * g_p = task_group_path(task_group(p));
-	group_length = strlen(g_p);
-	if (group_length > 5) {
-		/* BACKGROUND */
+	unsigned int i;
+	int len = 0;
+	char *grouppath = task_group_path(task_group(p));
+	len = strlen(grouppath);
+
+	////
+	if (len > 5) {
 		for_each_online_cpu(i) {
 			struct rq *rq = cpu_rq(i);
-			if (rq->background)
-				set_task_rq(p, rq->cpu);
+			if (rq->background) {
+				unsigned long flags;
+//				local_irq_save(flags);
+//				double_rq_lock(task_rq(p), rq);
+//				deactivate_task(task_rq(p), p, 0);
+//				set_task_cpu(p, i);
+				printk(KERN_ERR "BEFORE.............\n");
+				set_task_rq(p, task_cpu(p));
+				printk(KERN_ERR "AFTER.............\n");
+//				activate_task(task_rq(p), p, 0);
+//				double_rq_unlock(task_rq(p), rq);
+//				local_irq_restore(flags);
+				break;
+			}
 		}
 
 	} else {
-		/*FOREGROUND */
 		for_each_online_cpu(i) {
 			struct rq *rq = cpu_rq(i);
-			if (rq->foreground)
-				set_task_rq(p, rq->cpu);
+			if (rq->foreground) {
+				unsigned long flags;
+//				local_irq_save(flags);
+//				double_rq_lock(task_rq(p), rq);
+//				deactivate_task(task_rq(p), p, 0);
+//				set_task_rq(p, i);
+//
+				printk(KERN_ERR "BEFORE.............\n");
+				set_task_cpu(p, task_cpu(p));
+				printk(KERN_ERR "AFTER.............\n");
+//				activate_task(task_rq(p), p, 0);
+//				double_rq_unlock(task_rq(p), rq);
+//				local_irq_restore(flags);
+				break;
+			}
 		}
 	}
-	set_task_rq(p, task_cpu(p));
+	////
 }
 
 /*
@@ -477,16 +513,15 @@ const struct sched_class grr_sched_class = {
 
 #ifdef CONFIG_SMP
 	.select_task_rq		= select_task_rq_grr,
+#ifdef CONFIG_GRR_GROUPS
+	.task_move_group 	= task_move_group_grr,
+#endif
 #endif
 	.set_curr_task          = set_curr_task_grr,
 	.task_tick		= task_tick_grr,
 	.prio_changed		= prio_changed_grr,
 	.switched_to		= switched_to_grr,
 	.get_rr_interval	= get_rr_interval_grr,
-
-#ifdef CONFIG_GRR_GROUP_SCHED
-	.task_move_group 	= task_move_group_grr,
-#endif
 };
 
 #ifdef CONFIG_SCHED_DEBUG
