@@ -69,6 +69,12 @@ MODIFIED/ADDED FILES:
 - test/test.c
   test program that assigns cores to groups
 
+BRANCHES AND EXERCISE PARTS
+
+uniprocessor_rr -> Here you can find the round robin algorithm for a 
+uniprocessor. We have left 2 print statements in pick_next_task and enqueue
+in order to see that the RR algorithm takes place.
+
 RESOURCES USED:
 
 1. Linux Cross Reference
