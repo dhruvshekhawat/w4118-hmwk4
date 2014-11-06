@@ -242,24 +242,6 @@ void print_rt_rq(struct seq_file *m, int cpu, struct rt_rq *rt_rq)
 #undef P
 }
 
-#ifdef CONFIG_GRR
-void print_grr_rq(struct seq_file *m, int cpu, struct grr_rq *grr_rq)
-{
-	SEQ_printf(m, "\ngrr_rq[%d]:\n", cpu);
-
-#define P(x) \
-	SEQ_printf(m, "  .%-30s: %lld\n", #x, (long long)(grr_rq->x))
-#define PN(x) \
-	SEQ_printf(m, "  .%-30s: %lld.%06ld\n", #x, SPLIT_NS(grr_rq->x))
-
-	P(grr_nr_running);
-
-#undef PN
-#undef P
-}
-#endif
-
-
 extern __read_mostly int sched_clock_running;
 
 static void print_cpu(struct seq_file *m, int cpu)
@@ -321,9 +303,6 @@ static void print_cpu(struct seq_file *m, int cpu)
 	spin_lock_irqsave(&sched_debug_lock, flags);
 	print_cfs_stats(m, cpu);
 	print_rt_stats(m, cpu);
-#ifdef CONFIG_GRR
-	print_grr_stats(m, cpu);
-#endif
 	rcu_read_lock();
 	print_rq(m, rq, cpu);
 	rcu_read_unlock();
