@@ -21,12 +21,27 @@ struct load {
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se);
 
 #ifdef CONFIG_GRR_GROUPS
+/*
+ * Helperes to get the cgroup of tasks
+ */
 static char group_path[PATH_MAX];
-static char *task_group_path(struct task_group *tg);
+
+static char *task_group_path(struct task_group *tg)
+{
+	if (autogroup_path(tg, group_path, PATH_MAX))
+		return group_path;
+	if (!tg->css.cgroup) {
+		group_path[0] = '\0';
+		return group_path;
+	}
+	cgroup_path(tg->css.cgroup, group_path, PATH_MAX);
+	return group_path;
+}
 #endif
 
 /*
- * Helper to do...
+ * Helper to do check whether a task can move from a
+ * source rq to a target rq.
  */
 static int can_move_grr_task(struct task_struct *p,
 			     struct rq *source,
@@ -382,6 +397,79 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 #endif
 
 /*
+ * OK, this a bit complicated function and is used to move
+ * tasks from one group to another.
+ *
+ * The main complexity emmanates from the fact that there are
+ * some conditions need be fulfilled before you move from a
+ * queue of one group to a queue of another group. Also, when
+ * moving task we try to target the less loaded rq
+ * (use select_task_rq).
+ *
+ * All of the above happens  with local irqs turned off and a
+ * double lock held on both source and target rq. Note also
+ * the use of Messa Semantics, i.e., rechecking the source rq
+ * with the double lock held.
+ */
+static void task_move_group_grr(struct task_struct *p, int on_rq)
+{
+	int rq_id;
+	unsigned long flags;
+	struct rq *target_rq;
+	struct rq *source_rq;
+
+	/*
+	 * Select the less loaded queue that belong to the
+	 * group you want to get attached to.
+	 */
+	rq_id = select_task_rq_grr(p, 0, 0);
+	target_rq = cpu_rq(rq_id);
+	source_rq = task_rq(p);
+
+	/*
+	 * Start with double locking and save local interrupts
+	 * but check a bunch of things before moving indeed.
+	 */
+	local_irq_save(flags);
+	double_rq_lock(source_rq, target_rq);
+
+	/* Now that we hold the lock, are you still in the same rq? */
+	if (task_rq(p) != source_rq)
+//	{
+//		printk(KERN_ERR "OPSSSSSSSSSSSS2\n");
+		goto unlock;
+//	}
+	/* But...can you move to the selected queue? */
+	if (!can_move_grr_task(p, source_rq, target_rq))
+//	{
+//		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
+		goto unlock;
+//	}
+	/* And...are you sure that indeed you are moving? */
+	if (target_rq == source_rq )
+//	{
+//		printk(KERN_ERR "OPSSSSSSSSSSSS3\n");
+		goto unlock;
+//	}
+	/* Haha...but...are you not blocked? */
+	if (p->state != TASK_RUNNING && p->state != TASK_WAKING
+	    && !(task_thread_info(p)->preempt_count & PREEMPT_ACTIVE))
+//	{
+//		printk(KERN_ERR "OPSSSSSSSSSSSS4\n");
+		goto unlock;
+//	}
+	/* OK. FINE. Move away....*/
+//	printk(KERN_ERR "OK.....FINE....\n");
+	deactivate_task(source_rq, p, 0);
+	set_task_cpu(p, target_rq->cpu);
+	activate_task(target_rq, p, 0);
+
+unlock:
+	double_rq_unlock(source_rq, target_rq);
+	local_irq_restore(flags);
+}
+
+/*
  * register when a task started executing.
  */
 static void set_curr_task_grr(struct rq *rq)
@@ -442,77 +530,6 @@ static inline unsigned int
 get_rr_interval_grr(struct rq *rq, struct task_struct *task)
 {
 	return GRR_TIMESLICE;
-}
-
-static char *task_group_path(struct task_group *tg)
-{
-	if (autogroup_path(tg, group_path, PATH_MAX))
-		return group_path;
-	if (!tg->css.cgroup) {
-		group_path[0] = '\0';
-		return group_path;
-	}
-	cgroup_path(tg->css.cgroup, group_path, PATH_MAX);
-	return group_path;
-}
-
-static void task_move_group_grr(struct task_struct *p, int on_rq)
-{
-
-	unsigned long i;
-	unsigned long flags;
-	struct rq *target_rq;
-	struct rq *source_rq;
-	char *grouppath = task_group_path(task_group(p));
-
-	
-	int ttt = select_task_rq_grr(p, 0, 0);
-	target_rq = cpu_rq(ttt);
-	source_rq = task_rq(p);
-	
-//	if (!can_move_grr_task(p, source_rq, target_rq))
-//	{
-//		printk(KERN_ERR "NO LOCK\n");
-//		return;
-//	}
-
-	local_irq_save(flags);
-	double_rq_lock(source_rq, target_rq);
-	printk(KERN_ERR "Will go to:%d\n", ttt);
-
-	/* Now that we hold the lock, are you still in the same rq? */
-	if (task_rq(p) != source_rq)
-	{
-		printk(KERN_ERR "OPSSSSSSSSSSSS2\n");
-		goto unlock;
-	}
-
-	if (!can_move_grr_task(p, source_rq, target_rq))
-	{
-		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
-		goto unlock;
-	}
-	/* maybe unnecessary */
-	if (target_rq == source_rq )
-	{
-		printk(KERN_ERR "OPSSSSSSSSSSSS3\n");
-		goto unlock;
-	}
-
-	if (p->state != TASK_RUNNING && p->state != TASK_WAKING
-	    && !(task_thread_info(p)->preempt_count & PREEMPT_ACTIVE))
-	{
-		printk(KERN_ERR "OPSSSSSSSSSSSS4\n");
-		goto unlock;
-	}
-	printk(KERN_ERR "NOOOOOOOOOO---OPSSSSSSSSSSSS\n");
-	deactivate_task(source_rq, p, 0);
-	set_task_cpu(p, target_rq->cpu);
-	activate_task(target_rq, p, 0);
-
-unlock:
-	double_rq_unlock(source_rq, target_rq);
-	local_irq_restore(flags);
 }
 
 /*
