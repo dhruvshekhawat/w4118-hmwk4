@@ -459,7 +459,11 @@ static void task_move_group_grr(struct task_struct *p, int on_rq)
 	int ttt = select_task_rq_grr(p, 0, 0);
 	target_rq = cpu_rq(ttt);
 	source_rq = task_rq(p);
-
+	if (!can_move_grr_task(p, source_rq, target_rq))
+	{
+		printk(KERN_ERR "NO LOCK\n");
+		return;
+	}
 
 	local_irq_save(flags);
 	double_rq_lock(source_rq, target_rq);
@@ -469,7 +473,6 @@ static void task_move_group_grr(struct task_struct *p, int on_rq)
 	{
 		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
 		goto unlock;
-	}
 
 	if (task_rq(p) != source_rq)
 	{
@@ -482,8 +485,6 @@ static void task_move_group_grr(struct task_struct *p, int on_rq)
 		printk(KERN_ERR "OPSSSSSSSSSSSS3\n");
 		goto unlock;
 	}
-
-
 
 	if (p->state != TASK_RUNNING && p->state != TASK_WAKING
 	    && !(task_thread_info(p)->preempt_count & PREEMPT_ACTIVE))
