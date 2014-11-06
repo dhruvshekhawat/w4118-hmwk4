@@ -1,49 +1,80 @@
-task_struct HAS sched_entity (one per class) HAS run_queue (one per CPU custom to sched_class)
+E. Atlidakis, G. Koloventzos, A. Papancea
+UNI: ea2615, gk2409, alp2200
+Last updated: 11/06/2014
 
+ASSUMPTIONS:
 
-struct sched_grr_entity {
-	struct list_head task_queue;
-	unsigned long timeout;
-	unsigned int time_slice;
-	int nr_cpus_allowed;
-	struct sched_grr_entity *back;
-	struct grr_rq *grr_rq;
-	struct grr_rq *my_q;
-};
+We followed the instructions without making any additional assumptions.
 
-/* GRR classes' related field in a runqueue: */
-struct grr_rq {
-	unsigned long grr_nr_running;
-#ifdef CONFIG_SMP
-	unsigned long grr_nr_migratory;
-	unsigned long grr_nr_total;
-	int overloaded;
-	struct plist_head pushable_tasks;
-#endif
-	int grr_throttled;
-	u64 grr_time;
-	u64 grr_runtime;
-	/* Nests inside the rq lock: */
-	raw_spinlock_t grr_runtime_lock;
+MODIFIED/ADDED FILES:
 
-#ifdef CONFIG_RT_GROUP_SCHED
-	unsigned long grr_nr_boosted;
+- flo-kernel/arch/arm/configs/flo_defconfig
+  defined CONFIG_GRR and CONFIG_GRR_GROUPS flags
 
-	struct rq *rq;
-	struct list_head queue;
-	struct task_group *tg;
-#endif
-};
+- flo-kernel/arch/arm/configs/goldfish_armv7_defconfig
+  defined CONFIG_GRR and CONFIG_GRR_GROUPS flags
 
+- flo-kernel/arch/arm/include/asm/unistd.h
+  defined sched_set_CPUgroup syscall at position 378
 
-struct rq {
-....
-	struct cfs_rq cfs;
-	struct rt_rq rt;
-#ifdef CONFIG_GRR
-	struct grr_rq grr;
-#endif
-....
-};
+- flo-kernel/arch/arm/kernel/calls.S
+  added syscall to syscall table at position 378
 
+- flo-kernel/include/linux/init_task.h
+  modified init task to be scheduled using the GRR policy
+
+- flo-kernel/include/linux/sched.h
+  modified sched.h for various headers and structs used
+  within the assignment; primarily, we defined SCHED_GRR
+  policy, sched_grr_entity
+
+- flo-kernel/include/linux/syscalls.h
+  defined the syscall sched_set_CPUgroup
+
+- flo-kernel/init/Kconfig
+  more setup for the CONFIG_GRR and CONFIG_GRR_GROUPS flags
+
+- flo-kernel/kernel/kthread.c
+  added sched_setscheduler_nocheck() function for the GRR policy
+
+- flo-kernel/kernel/sched/Makefile
+  added grr.c binary to the kernel compilation
+
+- flo-kernel/kernel/sched/core.c
+  implementation of the sched_set_CPUgroup syscall, as well as
+  matching relevant code to the other scheduling policies;
+  added timer for the GRR load balancer
+
+- flo-kernel/kernel/sched/debug.c
+  added print_grr_rq function for GRR debugging
+
+- flo-kernel/kernel/sched/grr.c
+  GRR class implementation
+
+- flo-kernel/kernel/sched/rt.c
+  added grr_sched_class as the next scheduling class
+  after the realtime scheduling class
+
+- flo-kernel/kernel/sched/sched.h
+  modified sched.h for various headers and structs used
+  within the assignment; primarily, we defined SCHED_GRR
+  policy, sched_grr_entity
+
+- test/Makefile
+  Makefile for the test program
+
+- test/set_sched_policy.c
+  test program that auto-schedules itself using the GRR class
+
+- test/test.c
+  test program that assigns cores to groups
+
+RESOURCES USED:
+
+1. Linux Cross Reference
+   http://lxr.free-electrons.com
+
+2. Linux Kernel Development (3rd Edition)
+
+3. Operating Systems: Principles and Practice (2nd Edition)
 
