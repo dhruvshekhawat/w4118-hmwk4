@@ -896,6 +896,7 @@ extern void idle_balance(int this_cpu, struct rq *this_rq);
 
 #ifdef CONFIG_GRR
 extern void grr_load_balance(void);
+extern void try_steal_task(struct rq  *rq, int cpu);
 #endif
 
 #else	/* CONFIG_SMP */

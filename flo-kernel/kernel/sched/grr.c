@@ -37,10 +37,9 @@ static char *task_group_path(struct task_group *tg)
 	cgroup_path(tg->css.cgroup, group_path, PATH_MAX);
 	return group_path;
 }
-#endif
 
 /*
- * Helper to do check whether a task can move from a
+ * Helper to check whether a task can move from a
  * source rq to a target rq.
  */
 static int can_move_grr_task(struct task_struct *p,
@@ -58,6 +57,8 @@ static int can_move_grr_task(struct task_struct *p,
 		return 0;
 	return 1;
 }
+
+#endif
 
 /*
  * Load balancer that does...
@@ -556,3 +557,51 @@ const struct sched_class grr_sched_class = {
 	.switched_to		= switched_to_grr,
 	.get_rr_interval	= get_rr_interval_grr,
 };
+
+void try_steal_task(struct rq* target_rq, int dest_cpu)
+{
+	unsigned long i;
+	struct rq *source_rq;
+	struct task_struct *p;
+	struct sched_grr_entity *head;
+	struct sched_grr_entity *grr_se;
+
+	for_each_online_cpu(i) {
+		
+		source_rq = cpu_rq(i);
+
+#ifdef CONFIG_GRR_GROUPS
+		if (source_rq->background != target_rq->background ||
+		    source_rq->foreground != target_rq->foreground)
+			continue;
+#endif
+		if (source_rq == target_rq)
+			continue;
+		
+		double_rq_lock(source_rq, target_rq);
+
+		if (list_empty(&source_rq->grr.queue)) {
+			double_rq_unlock(source_rq, target_rq);
+			continue;
+		}
+
+		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
+			p = grr_task_of(grr_se);
+			
+			if (!can_move_grr_task(p, source_rq, target_rq) || p->policy != SCHED_GRR)
+				continue;
+			
+			if (p->on_rq) {
+				dequeue_task_grr(source_rq, p, 0);
+				set_task_cpu(p, dest_cpu);
+				enqueue_task_grr(target_rq, p, 0);
+				check_preempt_curr(target_rq, p, 0);
+				double_rq_unlock(source_rq, target_rq);
+				trace_printk("idle CPU %d stole task %s from CPU %d\n",
+					     dest_cpu, p->comm, i);
+				return;
+			}
+		}
+		double_rq_unlock(source_rq, target_rq);
+	}
+}

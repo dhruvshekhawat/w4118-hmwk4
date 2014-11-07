@@ -3086,6 +3086,9 @@ void scheduler_tick(void)
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
 	trigger_load_balance(rq, cpu);
+#ifdef CONFIG_GRR
+	try_steal_task(rq, cpu);
+#endif
 #endif
 }
 
