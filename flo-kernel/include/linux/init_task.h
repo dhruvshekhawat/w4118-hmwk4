@@ -142,7 +142,7 @@ extern struct cred init_cred;
 		.task_queue     = LIST_HEAD_INIT(tsk.grr.task_queue),   \
 	},
   #ifndef GRR_TIMESLICE
-    #define GRR_TIMESLICE 100 * HZ / 1000
+    #define GRR_TIMESLICE (100 * HZ / 1000)
   #endif
 #else
   #define SCHED_NORMAL_OR_GRR SCHED_NORMAL

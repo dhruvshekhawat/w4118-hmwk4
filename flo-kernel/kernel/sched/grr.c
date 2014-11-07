@@ -1,26 +1,17 @@
-/*
+/* linux/kernel/sched/grr.c
+ *
  * Round-Robin Scheduling Class (mapped to the SCHED_GRR policy)
+ *
+ * Copyright (C) 2014 V. Atlidakis, G. Koloventzos, A. Papancea
+ *
  */
-
 #include "sched.h"
 
 #include <linux/slab.h>
 #include <linux/limits.h>
 
 
-#ifdef CONFIG_SMP
-/*
- * Load balancing is applicable only to multicore CPUs.
- */
-struct load {
-	unsigned long nr_running;
-	struct rq *rq;
-	int cpu;
-};
-
-static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se);
-
-#ifdef CONFIG_GRR_GROUPS
+#if defined(CONFIG_SMP) && defined(CONFIG_GRR_GROUPS)
 /*
  * Helperes to get the cgroup of tasks
  */
@@ -57,115 +48,8 @@ static int can_move_grr_task(struct task_struct *p,
 		return 0;
 	return 1;
 }
+#endif /* CONFIG_GRR_GROUPS && CONFIG_SMP*/
 
-#endif
-
-/*
- * Load balancer that does...
- */
-void grr_load_balance(void)
-{
-	unsigned long i;
-	int cpus_online, j;
-	struct load maxload;
-	struct load minload;
-	struct rq *source_rq;
-	struct rq *target_rq;
-	struct task_struct *p;
-	unsigned long flags;
-	struct sched_grr_entity *grr_se;
-
-	trace_printk("Starting loadbalancing\n");
-
-#ifdef CONFIG_GRR_GROUPS 
-	for (j = FOREGROUND; j <= BACKGROUND; j++) {
-#else
-	j = 1;
-#endif
-	cpus_online = 0;
-	maxload.nr_running = 0;
-	minload.nr_running = 1000000;
-
-	/*
-	 * iterate through each CPU and
-	 * find the min and max load accros all CPUs
-	 */
-	for_each_online_cpu(i) {
-		struct rq *rq = cpu_rq(i);
-		struct grr_rq *grr_rq = &rq->grr;
-		unsigned long nr_running = grr_rq->grr_nr_running;
-
-#ifdef CONFIG_GRR_GROUPS
-		if (j == FOREGROUND && !rq->foreground)
-			continue;
-		else if (j == BACKGROUND && !rq->background)
-			continue;
-#endif
-		if (nr_running > maxload.nr_running) {
-			maxload.nr_running = nr_running;
-			maxload.rq = rq;
-			maxload.cpu = i;
-		}
-		if (nr_running < minload.nr_running) {
-			minload.nr_running = nr_running;
-			minload.rq = rq;
-			minload.cpu = i;
-		}
-		cpus_online++;
-	}
-	if (cpus_online < 2)
-		return;
-
-	if (maxload.nr_running > minload.nr_running + 1) {
-
-		source_rq = maxload.rq;
-		target_rq = minload.rq;
-		local_irq_save(flags);
-		double_rq_lock(source_rq, target_rq);
-
-		/* imbalance no longer valid */
-		if (source_rq->grr.grr_nr_running <=
-		    target_rq->grr.grr_nr_running + 1)
-			goto unlock;
-
-		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
-			p = grr_task_of(grr_se);
-			if (!can_move_grr_task(p, source_rq, target_rq))
-				continue;
-			/*
-			 * move task p from source_rq to target_rq
-			 * see sched_move_task() in core.c for details
-			 */
-			deactivate_task(source_rq, p, 0);
-			set_task_cpu(p, target_rq->cpu);
-			activate_task(target_rq, p, 0);
-			trace_printk("Moved task %s of group %d from CPU %d to"
-				     " CPU %d\n", p->comm, j, source_rq->cpu,
-				     target_rq->cpu);
-			goto unlock;
-		}
-		goto unlock;
-	}
-#ifdef CONFIG_GRR_GROUPS
-	trace_printk("Finished loadbalancing of group: %d (no migration)\n", j);
-	continue;
-#else
-	trace_printk("Finished loadbalancing (no migration)\n");
-	return;
-#endif
-
-unlock:
-	double_rq_unlock(source_rq, target_rq);
-	local_irq_restore(flags);
-
-#ifdef CONFIG_GRR_GROUPS
-		trace_printk("Finished loadbalancing of group: %d\n", j);
-	} /* for block end */
-#else
-	trace_printk("Finished loadbalancing\n");
-#endif
-}
-#endif /* CONFIG_SMP */
 
 static inline struct task_struct *grr_task_of(struct sched_grr_entity *grr_se)
 {
@@ -361,7 +245,7 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	unsigned long orig_nr;
 	unsigned long i;
 	unsigned long min_nr;
-        int len = 0;
+	int len = 0;
 	char *grouppath = task_group_path(task_group(p));
 	len = strlen(grouppath);
 
@@ -436,31 +320,18 @@ static void task_move_group_grr(struct task_struct *p, int on_rq)
 
 	/* Now that we hold the lock, are you still in the same rq? */
 	if (task_rq(p) != source_rq)
-//	{
-//		printk(KERN_ERR "OPSSSSSSSSSSSS2\n");
 		goto unlock;
-//	}
 	/* But...can you move to the selected queue? */
 	if (!can_move_grr_task(p, source_rq, target_rq))
-//	{
-//		printk(KERN_ERR "OPSSSSSSSSSSSS1\n");
 		goto unlock;
-//	}
 	/* And...are you sure that indeed you are moving? */
-	if (target_rq == source_rq )
-//	{
-//		printk(KERN_ERR "OPSSSSSSSSSSSS3\n");
+	if (target_rq == source_rq)
 		goto unlock;
-//	}
 	/* Haha...but...are you not blocked? */
 	if (p->state != TASK_RUNNING && p->state != TASK_WAKING
 	    && !(task_thread_info(p)->preempt_count & PREEMPT_ACTIVE))
-//	{
-//		printk(KERN_ERR "OPSSSSSSSSSSSS4\n");
 		goto unlock;
-//	}
 	/* OK. FINE. Move away....*/
-//	printk(KERN_ERR "OK.....FINE....\n");
 	deactivate_task(source_rq, p, 0);
 	set_task_cpu(p, target_rq->cpu);
 	activate_task(target_rq, p, 0);
@@ -548,7 +419,7 @@ const struct sched_class grr_sched_class = {
 #ifdef CONFIG_SMP
 	.select_task_rq		= select_task_rq_grr,
 #ifdef CONFIG_GRR_GROUPS
-	.task_move_group 	= task_move_group_grr,
+	.task_move_group	= task_move_group_grr,
 #endif
 #endif
 	.set_curr_task          = set_curr_task_grr,
@@ -558,16 +429,21 @@ const struct sched_class grr_sched_class = {
 	.get_rr_interval	= get_rr_interval_grr,
 };
 
-void try_steal_task(struct rq* target_rq, int dest_cpu)
+
+#ifdef CONFIG_SMP
+
+/*
+ * Function that tries to...
+ */
+void try_steal_task(struct rq *target_rq, int dest_cpu)
 {
 	unsigned long i;
 	struct rq *source_rq;
 	struct task_struct *p;
-	struct sched_grr_entity *head;
 	struct sched_grr_entity *grr_se;
 
 	for_each_online_cpu(i) {
-		
+
 		source_rq = cpu_rq(i);
 
 #ifdef CONFIG_GRR_GROUPS
@@ -577,7 +453,7 @@ void try_steal_task(struct rq* target_rq, int dest_cpu)
 #endif
 		if (source_rq == target_rq)
 			continue;
-		
+
 		double_rq_lock(source_rq, target_rq);
 
 		if (list_empty(&source_rq->grr.queue)) {
@@ -587,10 +463,10 @@ void try_steal_task(struct rq* target_rq, int dest_cpu)
 
 		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
 			p = grr_task_of(grr_se);
-			
-			if (!can_move_grr_task(p, source_rq, target_rq) || p->policy != SCHED_GRR)
+
+			if (!can_move_grr_task(p, source_rq, target_rq)
+			    || p->policy != SCHED_GRR)
 				continue;
-			
 			if (p->on_rq) {
 				dequeue_task_grr(source_rq, p, 0);
 				set_task_cpu(p, dest_cpu);
@@ -598,10 +474,122 @@ void try_steal_task(struct rq* target_rq, int dest_cpu)
 				check_preempt_curr(target_rq, p, 0);
 				double_rq_unlock(source_rq, target_rq);
 				trace_printk("idle CPU %d stole task %s from CPU %d\n",
-					     dest_cpu, p->comm, i);
+					     (int) dest_cpu, p->comm, (int) i);
 				return;
 			}
 		}
 		double_rq_unlock(source_rq, target_rq);
 	}
 }
+
+struct load {
+	unsigned long nr_running;
+	struct rq *rq;
+	int cpu;
+};
+
+/*
+ * Load balancer that does...
+ */
+void grr_load_balance(void)
+{
+	unsigned long i;
+	int cpus_online, j;
+	struct load maxload;
+	struct load minload;
+	struct rq *source_rq;
+	struct rq *target_rq;
+	struct task_struct *p;
+	unsigned long flags;
+	struct sched_grr_entity *grr_se;
+
+	trace_printk("Starting loadbalancing\n");
+
+#ifdef CONFIG_GRR_GROUPS
+	for (j = FOREGROUND; j <= BACKGROUND; j++) {
+#else
+	j = 1;
+#endif
+	cpus_online = 0;
+	maxload.nr_running = 0;
+	minload.nr_running = 1000000;
+
+	/*
+	 * iterate through each CPU and
+	 * find the min and max load accros all CPUs
+	 */
+	for_each_online_cpu(i) {
+		struct rq *rq = cpu_rq(i);
+		struct grr_rq *grr_rq = &rq->grr;
+		unsigned long nr_running = grr_rq->grr_nr_running;
+
+#ifdef CONFIG_GRR_GROUPS
+		if (j == FOREGROUND && !rq->foreground)
+			continue;
+		else if (j == BACKGROUND && !rq->background)
+			continue;
+#endif
+		if (nr_running > maxload.nr_running) {
+			maxload.nr_running = nr_running;
+			maxload.rq = rq;
+			maxload.cpu = i;
+		}
+		if (nr_running < minload.nr_running) {
+			minload.nr_running = nr_running;
+			minload.rq = rq;
+			minload.cpu = i;
+		}
+		cpus_online++;
+	}
+	if (cpus_online < 2)
+		return;
+
+	if (maxload.nr_running > minload.nr_running + 1) {
+
+		source_rq = maxload.rq;
+		target_rq = minload.rq;
+		local_irq_save(flags);
+		double_rq_lock(source_rq, target_rq);
+
+		/* imbalance no longer valid */
+		if (source_rq->grr.grr_nr_running <=
+		    target_rq->grr.grr_nr_running + 1)
+			goto unlock;
+
+		list_for_each_entry(grr_se, &source_rq->grr.queue, task_queue) {
+			p = grr_task_of(grr_se);
+			if (!can_move_grr_task(p, source_rq, target_rq))
+				continue;
+			/*
+			 * move task p from source_rq to target_rq
+			 * see sched_move_task() in core.c for details
+			 */
+			deactivate_task(source_rq, p, 0);
+			set_task_cpu(p, target_rq->cpu);
+			activate_task(target_rq, p, 0);
+			trace_printk("Moved task %s from CPU %d to CPU %d\n",
+				     p->comm, source_rq->cpu,
+				     target_rq->cpu);
+			goto unlock;
+		}
+		goto unlock;
+	}
+#ifdef CONFIG_GRR_GROUPS
+	trace_printk("Finished loadbalancing of group: %d (no migration)\n", j);
+	continue;
+#else
+	trace_printk("Finished loadbalancing (no migration)\n");
+	return;
+#endif
+unlock:
+	double_rq_unlock(source_rq, target_rq);
+	local_irq_restore(flags);
+#ifdef CONFIG_GRR_GROUPS
+		trace_printk("Finished loadbalancing of group: %d\n", j);
+	} /* for block end */
+#else
+	trace_printk("Finished loadbalancing\n");
+#endif
+}
+
+#endif /* CONFIG_SMP */

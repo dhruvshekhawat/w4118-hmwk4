@@ -8498,12 +8498,12 @@ SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 
 	if (current_euid() != 0 && current_uid() != 0)
 		return -EACCES;
-	if (numCPU < 1 || (numCPU >= NR_CPUS && NR_CPUS > 1))
+	if (numCPU < 1 || (numCPU >= nr_cpu_ids && nr_cpu_ids > 1))
 		return -EINVAL;
 	if (group != 1 && group != 2)
 		return -EINVAL;
 
-	if (NR_CPUS == 1) {
+	if (nr_cpu_ids == 1) {
 		assign_cpu_to_both_groups(cpu);
 		return 0;
 	}
@@ -8522,21 +8522,4 @@ SYSCALL_DEFINE2(sched_set_CPUgroup, int, numCPU, int, group)
 	}
 
 	return 0;
-}
-
-/*
- * Helper function for getting the group of a task
- * p: task pointer from which we want the group
- */
-static int get_cgroup(struct task_struct *p)
-{
-//	char *group_path = task_group_path(task_group(p));
-//	int lenght = strlen(group_path);
-//	/*
-//	 * length > 6 because the foreground group
-//	 * is either / or /apps
-//	 */
-//	if (length > 6)
-//		return BACKGROUND;
-	return FOREGROUND;
 }
