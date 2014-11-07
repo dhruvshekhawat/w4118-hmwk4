@@ -1,0 +1,22 @@
+Investigation and Demo
+
+We are using the Geekbench 3 app for measuring ours scheduler performance.
+We have found
+With equal CPU in foreground and background : 1034 for smp
+With 3 CPUs in foreground and 1 in background: 1180 for smp
+With 1 CPU in foreground and 3 in background: 616 with smp exactly the same as
+single core.
+
+Our results show that giving more CPUs to a task does not guarantee that it will
+run 3 times faster. This is due to the fact that the 3rd CPU is not Cache hot
+and it needs to some cache exchanges. We also mention that when we run our
+foreground to only one bounded CPU we get (for our results) the exact same
+value as the single core experiment of Geekbench. Also we have tried to 
+send geekbench to background and back to see how this will transfer the
+load to the rest of the CPUs. Our result from this cannot be representative as
+the load was not distributing equally so the results depending on how much more
+time we leave it on the group with more cores.
+
+In general our scheduler is not as good the default fair one. This can be seen
+even in boot time of our tablet. Our scheduler it can help when we have a 
+cpu intensive app and we want to run it in more queues than the fair does.

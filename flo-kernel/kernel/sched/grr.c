@@ -263,9 +263,9 @@ select_task_rq_grr(struct task_struct *p, int sd_flag, int flags)
 	for_each_online_cpu(i) {
 		struct grr_rq *grr_rq = &cpu_rq(i)->grr;
 #ifdef CONFIG_GRR_GROUPS
-		if (len > 5 && rq->foreground)
+		if (len >= 5 && rq->foreground)
 			continue;
-		if (len <= 5 && rq->background)
+		if (len < 5 && rq->background)
 			continue;
 #endif
 		if (!cpumask_test_cpu(i, &p->cpus_allowed))
