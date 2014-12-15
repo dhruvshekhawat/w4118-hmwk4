@@ -1,12 +1,10 @@
-E. Atlidakis, G. Koloventzos, A. Papancea
-UNI: ea2615, gk2409, alp2200
-Last updated: 11/06/2014
+Implementation of a Linux RR scheduler and an Android Linux group based scheduler.
+==
+Copyright (C) 2014 V. Atlidakis, G. Koloventzos, A. Papancea
 
-ASSUMPTIONS:
+COMS-W4118 Columbia University
 
-We followed the instructions without making any additional assumptions.
-
-MODIFIED/ADDED FILES:
+## MODIFIED/ADDED FILES:
 
 - flo-kernel/arch/arm/configs/flo_defconfig
   defined CONFIG_GRR and CONFIG_GRR_GROUPS flags
@@ -69,14 +67,15 @@ MODIFIED/ADDED FILES:
 - test/test.c
   test program that assigns cores to groups
 
-BRANCHES AND EXERCISE PARTS
+## BRANCHES AND EXERCISE PARTS
 
 uniprocessor_rr -> Here you can find the round robin algorithm for a 
 uniprocessor. We have left 2 print statements in pick_next_task and enqueue
 in order to see that the RR algorithm takes place.
 
 smp_devel -> Here you can find the part 2 of our assignment.
-RESOURCES USED:
+
+## RESOURCES USED:
 
 1. Linux Cross Reference
    http://lxr.free-electrons.com
